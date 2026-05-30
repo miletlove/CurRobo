@@ -1,0 +1,27 @@
+
+
+Breakpoint=C:/Users/30681/Desktop/CurRobo/Core/Src/main.c:118, State=BP_STATE_DISABLED
+Breakpoint=C:/Users/30681/Desktop/CurRobo/Core/Src/main.c:130:25, State=BP_STATE_DISABLED
+Breakpoint=C:/Users/30681/Desktop/CurRobo/Core/Src/main.c:161:1, State=BP_STATE_DISABLED
+GraphedExpression="HAL_FDCAN_ERROR_PARAM", DisplayFormat=DISPLAY_FORMAT_DEC, Color=#a00909
+OpenDocument="main.c", FilePath="C:/Users/30681/Desktop/CurRobo/Core/Src/main.c", Line=60
+OpenDocument="stm32h7xx_it.c", FilePath="C:/Users/30681/Desktop/CurRobo/Core/Src/stm32h7xx_it.c", Line=61
+OpenDocument="stm32h7xx_hal_fdcan.c", FilePath="C:/Users/30681/STM32Cube/Repository/STM32Cube_FW_H7_V1.13.0/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_fdcan.c", Line=2745
+OpenDocument="cybergear_motor.c", FilePath="C:/Users/30681/Desktop/CurRobo/Driver/Src/cybergear_motor.c", Line=50
+OpenDocument="stm32h7xx_hal.c", FilePath="C:/Users/30681/STM32Cube/Repository/STM32Cube_FW_H7_V1.13.0/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal.c", Line=316
+OpenDocument="can_bsp.c", FilePath="C:/Users/30681/Desktop/CurRobo/BSP/Src/can_bsp.c", Line=68
+OpenToolbar="Debug", Floating=0, x=-1, y=-1
+OpenWindow="Call Stack", DockArea=RIGHT, x=0, y=0, w=675, h=777, TabPos=1, TopOfStack=0, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
+OpenWindow="Registers 1", DockArea=RIGHT, x=0, y=1, w=675, h=949, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0, FilteredItems=[], RefreshRate=1
+OpenWindow="Source Files", DockArea=LEFT, x=0, y=0, w=300, h=1746, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
+OpenWindow="Disassembly", DockArea=RIGHT, x=0, y=0, w=675, h=777, TabPos=0, TopOfStack=0, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
+OpenWindow="Data Sampling", DockArea=BOTTOM, x=0, y=0, w=776, h=222, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0, VisibleTab=0, UniformSampleSpacing=0
+OpenWindow="Timeline", DockArea=BOTTOM, x=1, y=0, w=1139, h=222, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0, DataPaneShown=1, PowerPaneShown=1, CodePaneShown=1, PinCursor="Cursor Movable", TimePerDiv="1 ns / Div", TimeStampFormat="Time", DataGraphDrawAsPoints=0, DataGraphLegendShown=0, DataGraphUniformSampleSpacing=0, DataGraphLegendPosition="841;-67", PowerGraphDrawAsPoints=0, PowerGraphLegendShown=0, PowerGraphAvgFilterTime=Off, PowerGraphAvgFilterLen=Off, PowerGraphUniformSampleSpacing=0, PowerGraphLegendPosition="912;0", CodeGraphLegendShown=0, CodeGraphLegendPosition="927;0"
+TableHeader="Call Stack", SortCol="Function", SortOrder="ASCENDING", VisibleCols=["Function";"Stack Frame";"Source";"PC";"Return Address";"Stack Used"], ColWidths=[271;154;246;104;234;100]
+TableHeader="Source Files", SortCol="File", SortOrder="ASCENDING", VisibleCols=["File";"Status";"Size";"Path"], ColWidths=[205;100;100;974]
+TableHeader="Data Sampling Table", SortCol="None", SortOrder="ASCENDING", VisibleCols=["Index";"Time";" HAL_FDCAN_ERROR_PARAM"], ColWidths=[100;100;100]
+TableHeader="Data Sampling Setup", SortCol="Expression", SortOrder="DESCENDING", VisibleCols=["Expression";"Type";"Value";"Min";"Max";"Average";"# Changes";"Min. Change";"Max. Change"], ColWidths=[137;144;100;100;100;100;110;126;126]
+TableHeader="Power Sampling", SortCol="None", SortOrder="ASCENDING", VisibleCols=["Index";"Time";"Ch 0"], ColWidths=[100;100;100]
+TableHeader="Registers 1", SortCol="Name", SortOrder="ASCENDING", VisibleCols=["Name";"Value";"Description"], ColWidths=[142;118;415]
+TableHeader="RegisterSelectionDialog", SortCol="None", SortOrder="ASCENDING", VisibleCols=[], ColWidths=[]
+TableHeader="TargetExceptionDialog", SortCol="Name", SortOrder="ASCENDING", VisibleCols=["Name";"Value";"Address";"Description"], ColWidths=[200;100;100;1037]
