@@ -30,6 +30,7 @@
 #include "remote_control.h"
 #include "cybergear_motor.h"
 #include "bsp_usart.h"
+#include "ws2812.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -115,9 +116,45 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    /* ================================================================
+     *  WS2812 测试代码
+     *  阶段 0: 红灯亮 1s
+     *  阶段 1: 绿灯亮 1s
+     *  阶段 2: 蓝灯亮 1s
+     *  阶段 3: 彩虹灯效果 (循环)
+     * ================================================================ */
+    static uint8_t test_phase = 0;
 
+    switch (test_phase)
+    {
+    case 0:
+        /* 红灯亮 1 秒 */
+        WS2812_Ctrl(255, 0, 0);
+        HAL_Delay(1000);
+        test_phase = 1;
+        break;
 
+    case 1:
+        /* 绿灯亮 1 秒 */
+        WS2812_Ctrl(0, 255, 0);
+        HAL_Delay(1000);
+        test_phase = 2;
+        break;
 
+    case 2:
+        /* 蓝灯亮 1 秒 */
+        WS2812_Ctrl(0, 0, 255);
+        HAL_Delay(1000);
+        test_phase = 3;
+        break;
+
+    case 3:
+    default:
+        /* 彩虹灯效果 (每 20ms 更新一次, speed=3 适中速度) */
+        WS2812_Rainbow(3);
+        HAL_Delay(20);
+        break;
+    }
   /* USER CODE END 3 */
   }
 }
