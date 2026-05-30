@@ -1,11 +1,11 @@
 /**
- * @file    can_bsp.h
+ * @file    bsp_can.h
  * @brief   FDCAN 板级支持包 (BSP) — 扩展帧 CAN 通信接口
  * @note    适用于 STM32H723VGT6 + FDCAN1/FDCAN2 + CyberGear 电机
  *          使用扩展帧 29-bit ID, Classic CAN 模式, 1Mbps
  */
-#ifndef __CAN_BSP_H__
-#define __CAN_BSP_H__
+#ifndef __BSP_CAN_H__
+#define __BSP_CAN_H__
 
 #include "main.h"
 #include "fdcan.h"

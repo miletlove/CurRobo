@@ -7,7 +7,7 @@
  *          - 反馈帧:   type=2, CAN-data=位置/速度/力矩/温度 (大端序)
  */
 #include "cybergear_motor.h"
-#include "can_bsp.h"
+#include "bsp_can.h"
 
 /* ================================================================
  *  内部辅助: 构造扩展帧 ID

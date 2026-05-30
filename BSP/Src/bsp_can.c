@@ -1,9 +1,9 @@
 /**
- * @file    can_bsp.c
+ * @file    bsp_can.c
  * @brief   FDCAN 板级支持包 (BSP) 实现
- * @note    基于 CtrBoard-H7_ALL/Bsp/can_bsp.c, 适配扩展帧 + CyberGear
+ * @note    基于 CtrBoard-H7_ALL/Bsp/bsp_can.c, 适配扩展帧 + CyberGear
  */
-#include "can_bsp.h"
+#include "bsp_can.h"
 
 /* ================================================================
  *  滤波器初始化 — 扩展帧, 初期接受全部 ID
