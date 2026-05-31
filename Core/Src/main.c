@@ -30,6 +30,7 @@
 #include "remote_control.h"
 #include "cybergear_motor.h"
 #include "bsp_usart.h"
+#include "BMI088driver.h"
 #include "ws2812.h"
 /* USER CODE END Includes */
 
@@ -53,6 +54,7 @@
 CyberGear_Motor_t g_cg_motors[6];
 uint8_t           g_cg_motor_count = 6;
 uint32_t          g_print_tick = 0;
+float gyro[3], accel[3], temp;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -108,9 +110,13 @@ int main(void)
   MX_UART5_Init();
   /* USER CODE BEGIN 2 */
 
-  usart1_print("\r\n======== CurRobo RC + WS2812 ========\r\n");
+  usart1_print("\r\n======== CurRobo ========\r\n");
   remote_control_init();
-  usart1_print("RC init done, waiting for data...\r\n");
+
+  /* BMI088 初始化 */
+  usart1_print("BMI088 init... ");
+  if (BMI088_init() == 0) usart1_print("OK\r\n");
+  else usart1_print("FAILED\r\n");
 
   /* USER CODE END 2 */
 
@@ -120,56 +126,15 @@ int main(void)
   {
     /* USER CODE END WHILE */
 
+    
     /* USER CODE BEGIN 3 */
+    /* ---- WS2812 ---- */
+    WS2812_Rainbow(3);
+    HAL_Delay(20);
+    BMI088_read(&gyro[0], &accel[0], &temp);
 
-    /* ---- 遥控器检测 (每 100ms 打印) ---- */
-    if (HAL_GetTick() - g_print_tick >= 100) {
-        g_print_tick = HAL_GetTick();
-        const RC_ctrl_t *rc = get_remote_control_point();
-        if (RC_data_is_error()) {
-            usart1_print("[RC] offline\r\n");
-        } else {
-            usart1_print("CH0:%+d CH1:%+d CH2:%+d CH3:%+d CH4:%+d S0:%d S1:%d\r\n",
-                rc->rc.ch[0], rc->rc.ch[1], rc->rc.ch[2], rc->rc.ch[3], rc->rc.ch[4],
-                rc->rc.s[0], rc->rc.s[1]);
-        }
-    }
-
-    /* ---- WS2812 测试 ---- */
-    static uint8_t test_phase = 0;
-
-    switch (test_phase)
-    {
-    case 0:
-        /* 红灯亮 1 秒 */
-        WS2812_Ctrl(255, 0, 0);
-        HAL_Delay(1000);
-        test_phase = 1;
-        break;
-
-    case 1:
-        /* 绿灯亮 1 秒 */
-        WS2812_Ctrl(0, 255, 0);
-        HAL_Delay(1000);
-        test_phase = 2;
-        break;
-
-    case 2:
-        /* 蓝灯亮 1 秒 */
-        WS2812_Ctrl(0, 0, 255);
-        HAL_Delay(1000);
-        test_phase = 3;
-        break;
-
-    case 3:
-    default:
-        /* 彩虹灯效果 (每 20ms 更新一次, speed=3 适中速度) */
-        WS2812_Rainbow(3);
-        HAL_Delay(20);
-        break;
-    }
-  }
   /* USER CODE END 3 */
+  }
 }
 
 /**
