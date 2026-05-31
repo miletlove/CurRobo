@@ -63,6 +63,14 @@ void Error_Handler(void);
 #define POWER_OUT_2_GPIO_Port GPIOC
 #define POWER_5V_Pin GPIO_PIN_15
 #define POWER_5V_GPIO_Port GPIOC
+#define ACC_CS_Pin GPIO_PIN_0
+#define ACC_CS_GPIO_Port GPIOC
+#define GYRO_CS_Pin GPIO_PIN_3
+#define GYRO_CS_GPIO_Port GPIOC
+#define ACC_INT_Pin GPIO_PIN_10
+#define ACC_INT_GPIO_Port GPIOE
+#define GYRO_INT_Pin GPIO_PIN_12
+#define GYRO_INT_GPIO_Port GPIOE
 
 /* USER CODE BEGIN Private defines */
 

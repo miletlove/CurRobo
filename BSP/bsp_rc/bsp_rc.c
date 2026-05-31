@@ -58,31 +58,28 @@ static void USER_USART5_RxHandler(UART_HandleTypeDef *huart, uint16_t Size)
     if ((dma->CR & DMA_SxCR_CT) == RESET)
     {
         __HAL_DMA_DISABLE(huart->hdmarx);
-
-        if (Size == RC_FRAME_LENGTH)
-        {
-            SCB_InvalidateDCache_by_Addr((uint32_t *)sbus_buf[1], RC_FRAME_LENGTH);
-            sbus_to_rc(sbus_buf[1], &remote_ctrl);
-        }
-
+        SCB_InvalidateDCache_by_Addr((uint32_t *)sbus_buf[1], RC_FRAME_LENGTH);
+        sbus_to_rc(sbus_buf[1], &remote_ctrl);
         dma->CR |= DMA_SxCR_CT;
         __HAL_DMA_SET_COUNTER(huart->hdmarx, SBUS_RX_BUF_NUM);
     }
     else
     {
         __HAL_DMA_DISABLE(huart->hdmarx);
-
-        if (Size == RC_FRAME_LENGTH)
-        {
-            SCB_InvalidateDCache_by_Addr((uint32_t *)sbus_buf[0], RC_FRAME_LENGTH);
-            sbus_to_rc(sbus_buf[0], &remote_ctrl);
-        }
-
+        SCB_InvalidateDCache_by_Addr((uint32_t *)sbus_buf[0], RC_FRAME_LENGTH);
+        sbus_to_rc(sbus_buf[0], &remote_ctrl);
         dma->CR &= ~(DMA_SxCR_CT);
         __HAL_DMA_SET_COUNTER(huart->hdmarx, SBUS_RX_BUF_NUM);
     }
 
     __HAL_DMA_ENABLE(huart->hdmarx);
+
+    /* HAL 在 NORMAL 模式 IDLE 后会关闭 DMAR/IDLEIE/ReceptionType,
+     * 这里重新使能, 保证下次 IDLE 能再次触发回调 */
+    SET_BIT(huart->Instance->CR3, USART_CR3_DMAR);
+    __HAL_UART_ENABLE_IT(huart, UART_IT_IDLE);
+    huart->ReceptionType = HAL_UART_RECEPTION_TOIDLE;
+    huart->RxXferSize    = SBUS_RX_BUF_NUM;
 }
 
 /* ================================================================

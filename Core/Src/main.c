@@ -52,7 +52,7 @@
 /* USER CODE BEGIN PV */
 CyberGear_Motor_t g_cg_motors[6];
 uint8_t           g_cg_motor_count = 6;
-
+uint32_t          g_print_tick = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -103,9 +103,14 @@ int main(void)
   MX_FDCAN1_Init();
   MX_SPI6_Init();
   MX_FDCAN2_Init();
-  MX_UART5_Init();
   MX_USART1_UART_Init();
+  MX_SPI2_Init();
+  MX_UART5_Init();
   /* USER CODE BEGIN 2 */
+
+  usart1_print("\r\n======== CurRobo RC + WS2812 ========\r\n");
+  remote_control_init();
+  usart1_print("RC init done, waiting for data...\r\n");
 
   /* USER CODE END 2 */
 
@@ -116,13 +121,21 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    /* ================================================================
-     *  WS2812 测试代码
-     *  阶段 0: 红灯亮 1s
-     *  阶段 1: 绿灯亮 1s
-     *  阶段 2: 蓝灯亮 1s
-     *  阶段 3: 彩虹灯效果 (循环)
-     * ================================================================ */
+
+    /* ---- 遥控器检测 (每 100ms 打印) ---- */
+    if (HAL_GetTick() - g_print_tick >= 100) {
+        g_print_tick = HAL_GetTick();
+        const RC_ctrl_t *rc = get_remote_control_point();
+        if (RC_data_is_error()) {
+            usart1_print("[RC] offline\r\n");
+        } else {
+            usart1_print("CH0:%+d CH1:%+d CH2:%+d CH3:%+d CH4:%+d S0:%d S1:%d\r\n",
+                rc->rc.ch[0], rc->rc.ch[1], rc->rc.ch[2], rc->rc.ch[3], rc->rc.ch[4],
+                rc->rc.s[0], rc->rc.s[1]);
+        }
+    }
+
+    /* ---- WS2812 测试 ---- */
     static uint8_t test_phase = 0;
 
     switch (test_phase)
@@ -155,8 +168,8 @@ int main(void)
         HAL_Delay(20);
         break;
     }
-  /* USER CODE END 3 */
   }
+  /* USER CODE END 3 */
 }
 
 /**
