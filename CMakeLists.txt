@@ -41,7 +41,7 @@ add_executable(${CMAKE_PROJECT_NAME})
 #   2. 包含多个二级模块子目录 (如 CAN/, USART/),
 #      每个模块子目录下可有 Src/ Inc/ 或 src/ inc/ 或文件直接放置
 # =================================================================
-set(USER_FOLDERS "Driver" "Modules" "App" "BSP")
+set(USER_FOLDERS "Driver" "Modules" "App" "BSP" "Robo")
 
 # 创建列表存放用户源文件和头文件目录
 set(USER_SOURCES "")
