@@ -17,24 +17,26 @@
 CurRobo/
 ├── Core/                    # STM32CubeMX 自动生成 HAL 代码
 │   ├── Inc/                 # 外设头文件 (main.h, gpio.h, fdcan.h...)
-│   └── Src/                 # 外设源文件 (main.c, gpio.c, fdcan.c...)
-├── BSP/                     # 板级支持包 (Board Support Package)
-│   ├── Inc/                 # bsp_rc.h, bsp_usart.h, can_bsp.h
-│   └── Src/                 # 遥控器DMA接收, USART, FDCAN初始化和收发
-├── App/                     # 应用层模块
-│   ├── Inc/                 # cybergear_motor.h, remote_control.h, ws2812.h
-│   └── Src/                 # 电机控制, 遥控器解析, LED驱动
+│   └── Src/                 # 外设源文件 (main.c, fdcan.c, tim.c...)
+├── Robo/                    # 系统初始化管线
+│   └── pipeline.c/h         # 统一外设初始化顺序
+├── Modules/                 # 模块化驱动库
+│   ├── cybergear/           # CyberGear 电机两层 API
+│   │   ├── cybergear_motor.c/h   驱动层 (CAN 帧收发)
+│   │   └── cybergear_control.c/h 控制层 (阻抗/PID/轨迹)
+│   ├── BMI088/              # BMI088 IMU SPI 驱动
+│   ├── remote_control/      # 遥控器 DBUS 协议解析
+│   └── ws2812/              # WS2812 RGB LED 驱动
+├── App/                     # 应用层
+│   └── data_update/         # TIM6 1kHz 频率调度 + 周期数据更新
+├── BSP/                     # 板级支持包
+│   ├── bsp_can/             # FDCAN 初始化/收发
+│   ├── bsp_imu/             # BMI088 中间层 (SPI + CS)
+│   ├── bsp_rc/              # 遥控器 DMA 双缓冲接收
+│   └── bsp_usart/           # USART1 调试串口
 ├── cmake/                   # CMake 交叉编译工具链
-│   ├── gcc-arm-none-eabi.cmake
-│   └── starm-clang.cmake
 ├── build/                   # 构建输出目录
 ├── Docs/                    # 文档与参考例程
-│   ├── motor/               # 电机协议文档
-│   └── 例程/                # 达妙科技官方外设例程
-├── CMakeLists.txt           # 顶层 CMake 构建脚本
-├── CMakePresets.json        # CMake 预设配置 (Debug/Release)
-├── STM32H723XG_FLASH.ld     # 链接脚本
-├── startup_stm32h723xx.s    # 启动汇编文件
 ├── CurRobo.ioc              # STM32CubeMX 工程文件
 └── README.md
 ```
@@ -43,11 +45,14 @@ CurRobo/
 
 | 模块 | 功能说明 | 核心文件 |
 |------|---------|----------|
-| 🎮 **遥控器解析** | DBUS (SBUS) 协议解析, DMA 双缓冲接收 | `App/Inc/remote_control.h`, `BSP/Src/bsp_rc.c` |
-| 🏃 **电机控制** | CyberGear 系列 FOC 电机驱动, MIT 运控模式 | `App/Inc/cybergear_motor.h` |
-| 🌐 **CAN 通信** | FDCAN Classic Mode, 1Mbps, 29bit 扩展帧 | `BSP/Inc/can_bsp.h`, `Core/Src/fdcan.c` |
-| 💡 **RGB LED** | WS2812B 状态指示, SPI6 单线模拟协议 | `App/Inc/ws2812.h` |
-| 🔌 **串口通信** | UART 多路串口配置与收发 | `BSP/Src/bsp_usart.c` |
+| � **电机控制** | 两层 API: 驱动层 (CAN MIT 收发) + 控制层 (阻抗/PID/速度/力矩/轨迹) | `Modules/cybergear/` |
+| ⏱️ **数据更新** | TIM6 1kHz ISR 频率调度, 电机/IMU/LED/打印统一管理 | `App/data_update/` |
+| 🔄 **初始化管线** | 外设统一初始化顺序 (USART→CAN→电机→TIM6) | `Robo/pipeline.c` |
+| 🎮 **遥控器解析** | DBUS (SBUS) 协议解析, DMA 双缓冲接收 | `Modules/remote_control/`, `BSP/bsp_rc/` |
+| 🌐 **CAN 通信** | FDCAN Classic Mode, 1Mbps, 29bit 扩展帧 | `BSP/bsp_can/` |
+| 📐 **IMU 姿态** | BMI088 6 轴 IMU, SPI + DMA | `Modules/BMI088/`, `BSP/bsp_imu/` |
+| 💡 **RGB LED** | WS2812B 状态指示 | `Modules/ws2812/` |
+| 🔌 **调试串口** | USART1 格式化打印 | `BSP/bsp_usart/` |
 
 ## 🔧 开发环境
 

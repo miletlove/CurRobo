@@ -191,9 +191,8 @@ void cg_motor_parse_feedback(uint32_t ext_id, const uint8_t *data,
  *        用户在此处根据 ext_id 的 id 字段匹配对应电机对象并更新状态.
  * ================================================================ */
 
-/* ---- 电机对象数组 (由用户根据实际配置填充) ---- */
-#define CG_MOTOR_MAX 8
-extern CyberGear_Motor_t g_cg_motors[CG_MOTOR_MAX];   /* 外部声明, 用户定义 */
+/* ---- 电机对象数组 (由 main.c 定义) ---- */
+extern CyberGear_Motor_t g_cg_motors[];   /* 外部声明, 用户定义 */
 extern uint8_t           g_cg_motor_count;
 
 /**
