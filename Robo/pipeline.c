@@ -54,8 +54,8 @@ extern uint8_t              g_cg_motor_count;
  */
 void pipeline_init(void)
 {
-    /* ---- 1. 调试串口 ---- */
-    usart1_print("\r\n======== CurRobo ========\r\n");
+    /* ---- 1. 启动横幅 ---- */
+    usart1_print("\r\n==== CurRobo ====\r\n");
 
     /* ---- 2. 遥控器 ---- */
     remote_control_init();
@@ -64,29 +64,18 @@ void pipeline_init(void)
     can_power(ENABLE);
 
     /* ---- 4. BMI088 IMU ---- */
-    usart1_print("BMI088 init... ");
-    if (BMI088_init() == 0) usart1_print("OK\r\n");
-    else usart1_print("FAILED\r\n");
+    BMI088_init();
 
     /* ---- 5. CAN 总线 ---- */
-    usart1_print("CAN bus init... ");
     can_bsp_init();
-    usart1_print("OK\r\n");
 
     /* ---- 6. 电机初始化 ---- */
-    usart1_print("Motor init...\r\n");
     for (uint8_t i = 0; i < g_cg_motor_count; i++)
     {
         cg_motor_init(&g_cg_motors[i], i + 1, &hfdcan1);
         cg_ctrl_init(&g_cg_ctrl[i], &g_cg_motors[i]);
-        usart1_print("  Motor[%d] ID=%d on FDCAN1\r\n",
-                     i, g_cg_motors[i].motor_id);
     }
 
-    /* MIT 模式是电机上电默认, 无需显式设置, 省去 1 帧/电机 */
-
-    /* ---- 7. TIM6 1kHz 定时器 (最后启动) ---- */
+    /* ---- 7. TIM6 500Hz 定时器 ---- */
     data_update_init();
-    usart1_print("TIM6 1kHz started.\r\n");
-    usart1_print("======== Waiting for motors online... ========\r\n");
 }

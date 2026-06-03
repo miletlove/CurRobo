@@ -58,19 +58,11 @@ static uint8_t wheel_was_online = 0;
  *
  *  函数输出:
  *    - 电机 0 使能并进入速度模式
- *    - 串口打印初始化日志
  */
 void app_task_init(void)
 {
-    usart1_print("\r\n===== App Task Init =====\r\n");
-
     /* ---- 轮式控制初始化 ---- */
-    usart1_print("Wheel control init... ");
     wheel_init();
-    usart1_print("OK (SPEED mode, Kd=%.1f, max=%.1f rad/s)\r\n",
-                 WHEEL_KD_VELOCITY, WHEEL_MAX_SPEED_RAD_S);
-
-    usart1_print("==========================\r\n");
 }
 
 /* ================================================================
@@ -96,29 +88,37 @@ void app_task_run(void)
     /* ---- 2. 轮式控制更新 ---- */
     app_task_wheel_update();
 
-    /* ---- 3. DEBUG: 每 2 秒打印 FDCAN 诊断 ---- */
+    /* ---- 3. DEBUG: 每 5 秒打印 FDCAN 诊断 (仅值变化时) ---- */
     {
         static uint32_t last_dbg_tick = 0;
+        static uint32_t last_irq = 0, last_cb = 0, last_fb = 0;
+        static uint32_t last_fifo = 0;
+        static int last_online = -1;
         uint32_t now = data_update_get_tick_ms();
-        if (now - last_dbg_tick >= 2000)
+        if (now - last_dbg_tick >= 5000)
         {
             last_dbg_tick = now;
 
-            /* 外部调试计数器 (定义在 bsp_can.c / stm32h7xx_it.c / cybergear_motor.c) */
             extern volatile uint32_t g_dbg_can1_rx_irq_cnt;
             extern volatile uint32_t g_dbg_can1_rx_cb_cnt;
             extern volatile uint32_t g_dbg_fb_parsed_cnt;
             extern FDCAN_HandleTypeDef hfdcan1;
 
-            uint32_t fifo_fill = HAL_FDCAN_GetRxFifoFillLevel(&hfdcan1, FDCAN_RX_FIFO0);
+            uint32_t irq  = g_dbg_can1_rx_irq_cnt;
+            uint32_t cb   = g_dbg_can1_rx_cb_cnt;
+            uint32_t fb   = g_dbg_fb_parsed_cnt;
+            uint32_t fifo = HAL_FDCAN_GetRxFifoFillLevel(&hfdcan1, FDCAN_RX_FIFO0);
+            int online = g_cg_ctrl[0].online;
 
-            usart1_print("[DBG] IRQ=%lu CB=%lu FB=%lu FIFO=%lu online=%d en=%d\r\n",
-                         g_dbg_can1_rx_irq_cnt,
-                         g_dbg_can1_rx_cb_cnt,
-                         g_dbg_fb_parsed_cnt,
-                         fifo_fill,
-                         g_cg_ctrl[0].online,
-                         g_cg_ctrl[0].enabled);
+            /* 仅当值变化时打印 */
+            if (irq != last_irq || cb != last_cb || fb != last_fb ||
+                fifo != last_fifo || online != last_online)
+            {
+                usart1_print("[DBG] IRQ=%lu CB=%lu FB=%lu FIFO=%lu online=%d\r\n",
+                             irq, cb, fb, fifo, online);
+                last_irq = irq; last_cb = cb; last_fb = fb;
+                last_fifo = fifo; last_online = online;
+            }
         }
     }
 }
