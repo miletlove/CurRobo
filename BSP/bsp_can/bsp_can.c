@@ -14,6 +14,11 @@ volatile uint32_t g_dbg_can2_rx_cb_cnt = 0;  /* FDCAN2 回调计数 */
 volatile uint32_t g_dbg_can1_rx_irq_cnt = 0; /* FDCAN1 ISR 计数 */
 volatile uint32_t g_dbg_fb_parsed_cnt = 0;   /* 反馈帧解析成功计数 */
 
+volatile uint32_t g_dbg_rx_empty_cnt = 0;    /* can_bsp_receive 返回 0 次数 */
+volatile uint32_t g_dbg_rx_got_cnt   = 0;    /* can_bsp_receive 返回 >0 次数 */
+volatile uint32_t g_dbg_rx_first_ir  = 0;    /* 首次回调时 IR 寄存器值 */
+volatile uint32_t g_dbg_rx_last_ir   = 0;    /* 最近一次 IR 寄存器值 */
+
 /* ================================================================
  *  滤波器初始化 — 扩展帧, 初期接受全部 ID
  * ================================================================ */
@@ -212,6 +217,12 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan,
     else if (hfdcan == &hfdcan2)
         g_dbg_can2_rx_cb_cnt++;
 
+    /* DEBUG: 直接读 IR 寄存器, 看是哪个中断源触发的 */
+    uint32_t ir = hfdcan->Instance->IR;
+    if (g_dbg_can1_rx_cb_cnt == 1 && hfdcan == &hfdcan1)
+        g_dbg_rx_first_ir = ir;
+    g_dbg_rx_last_ir = ir;
+
     uint32_t ext_id;
     uint8_t  rx_buf[8];
     uint8_t  len;
@@ -220,7 +231,12 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan,
     {
         len = can_bsp_receive(&hfdcan1, &ext_id, rx_buf);
         if (len > 0)
+        {
+            g_dbg_rx_got_cnt++;
             can1_rx_callback(ext_id, rx_buf, len);
+        }
+        else
+            g_dbg_rx_empty_cnt++;
     }
     else if (hfdcan == &hfdcan2)
     {
