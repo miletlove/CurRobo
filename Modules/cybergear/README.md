@@ -1,25 +1,30 @@
-# Modules — CyberGear 电机驱动库
-
-本模块包含两层 API：
+# Modules — CyberGear 电机控制库 (精简版)
 
 | 文件 | 层级 | 职责 |
 |------|------|------|
-| `cybergear_motor.h/.c` | **驱动层** | CAN 帧收发、MIT 模式组包、反馈解析 |
-| `cybergear_control.h/.c` | **高级控制层** | 阻抗控制、PID、轨迹跟踪、重力/摩擦补偿 |
+| `cybergear_control.h/.c` | **控制层** | 阻抗控制、速度控制 |
+| ~~`cybergear_motor.h/.c`~~ | → 已迁移至 `BSP/bsp_motor/` | CAN 帧收发、MIT 模式组包、反馈解析 |
 
----
+## 控制模式
 
-## 一、硬件依赖
-- FDCAN1 / FDCAN2, 扩展帧 29-bit ID
+| 模式 | 枚举 | 公式 | 适用场景 |
+|------|------|------|---------|
+| 空闲 | `CG_CTRL_MODE_IDLE` | 不下发指令 | 未使能 |
+| 阻抗控制 | `CG_CTRL_MODE_IMPEDANCE` | $\tau = K(\theta_d-\theta) + D(\omega_d-\omega) + \tau_{ff}$ | 柔顺着陆、顺应地形 |
+| 速度控制 | `CG_CTRL_MODE_VELOCITY` | $\tau = K_d(\omega_d-\omega) + \tau_{ff}$ | 轮式运动 |
 
-## 二、CubeMX 要求
-- FDCAN: Classic CAN, 1Mbps, Extended ID
-- CAN 收发器供电: POWER_OUT1/POWER_OUT2
-- 电机 ID 通过 CyberGear 上位机预先配置
+## API
+```c
+void cg_ctrl_init(CyberGear_CtrlNode_t *ctrl, CyberGear_Motor_t *motor);
+void cg_ctrl_set_impedance(CyberGear_CtrlNode_t *ctrl, float stiffness, float damping);
+void cg_ctrl_set_velocity(CyberGear_CtrlNode_t *ctrl, float kd);
+void cg_ctrl_set_target(CyberGear_CtrlNode_t *ctrl, float pos, float vel, float torque_ff);
+uint8_t cg_ctrl_enable(CyberGear_CtrlNode_t *ctrl);
+uint8_t cg_ctrl_stop(CyberGear_CtrlNode_t *ctrl);
+uint8_t cg_ctrl_update_fixed(CyberGear_CtrlNode_t *ctrl, float dt);
+```
 
----
-
-## 三、驱动层 (cybergear_motor.c)
+> **注意**: `online` 仅用于状态监控, 不阻塞 MIT 帧发送。电机需要持续 MIT 帧才能维持反馈, 阻塞会导致死锁。
 
 ### 数据结构
 ```c
@@ -77,48 +82,20 @@ cg_motor_mit_control(&motor, &cmd);
 | 力矩控制 | `CG_CTRL_MODE_TORQUE` | $\tau = \tau_{des}$ | 力控站立、零力矩 |
 | 轨迹跟踪 | `CG_CTRL_MODE_TRAJECTORY` | 五次多项式最小 Jerk | 步态足端轨迹 |
 
-### 典型四足机器人参数参考
-
-| 参数 | 摆动相 | 站立相 |
-|------|--------|--------|
-| 刚度 K (Nm/rad) | 10 ~ 50 | 100 ~ 300 |
-| 阻尼 D (Nm/(rad/s)) | 0.5 ~ 3 | 3 ~ 10 |
-| 重力补偿 m (kg) | 0.5 ~ 2.0 | — |
-| 库伦摩擦 (Nm) | 0.05 ~ 0.3 | — |
-
 ### 使用示例
 
 ```c
-// 1. 定义电机和控制节点数组
-CyberGear_Motor_t    g_motors[8];
-CyberGear_CtrlNode_t g_ctrl[8];
-
-// 2. 初始化
-for (int i = 0; i < 8; i++) {
-    cg_motor_init(&g_motors[i], i + 1, (i < 4) ? &hfdcan1 : &hfdcan2);
-    cg_ctrl_init(&g_ctrl[i], &g_motors[i]);
-}
-
-// 3. 设置控制模式 (以髋关节阻抗控制为例)
-cg_ctrl_set_impedance(&g_ctrl[0], 50.0f, 3.0f);   // 刚度 50, 阻尼 3
-cg_ctrl_set_gravity_comp(&g_ctrl[0], 1.5f, 0.25f); // 质量 1.5kg, 质心距 0.25m
-cg_ctrl_set_friction_comp(&g_ctrl[0], 0.1f, 0.03f); // 库伦 0.1Nm, 粘滞 0.03
-cg_ctrl_set_target(&g_ctrl[0], 0.5f, 0.0f, 0.0f);  // 目标角度 0.5 rad
-
-// 4. 使能
+// 速度模式 (轮式): 遥控器摇杆 → 电机
+cg_ctrl_set_velocity(&g_ctrl[0], 0.6f);       // Kd=0.6
+cg_ctrl_set_target(&g_ctrl[0], 0, 1.0f, 0);   // target_velocity=1.0 rad/s
 cg_ctrl_enable(&g_ctrl[0]);
-
-// 5. 每个控制周期 (1kHz 任务中)
-void ctrl_task(void) {
-    for (int i = 0; i < 8; i++) {
-        cg_ctrl_sync_online(&g_ctrl[i]);  // 同步在线状态
-        cg_ctrl_update(&g_ctrl[i]);       // 计算并下发
-    }
-}
+// TIM6 ISR 中: cg_ctrl_update_fixed(&g_ctrl[0], 0.002f);  // 500Hz
 ```
 
 ### 注意事项
-- `cg_ctrl_update()` 建议在 FreeRTOS 任务中以 1kHz 频率调用
+- `cg_ctrl_update_fixed()` 在 TIM6 ISR 中以 500Hz 调用
+- `online` 仅用于状态监控, 不阻塞 MIT 帧发送
+- MIT 帧由 TIM6 ISR 独立发送, 不依赖主循环频率
 - 重力/摩擦补偿在 `cg_ctrl_update()` 内部自动叠加到前馈力矩
 - 模式切换时自动清零积分项，避免积分冲击
 - 所有控制输出自动限幅到 MIT 协议允许范围

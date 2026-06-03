@@ -8,7 +8,7 @@
 TIM6 ISR (1kHz)
   → g_sys_tick_ms++          (系统 tick 计数器)
   → data_update_dispatch()   (频率调度, ISR 上下文)
-    ├─ motor: 1kHz  → cg_ctrl_update_fixed() [ISR 安全 CAN 发送]
+    ├─ motor: 500Hz → cg_ctrl_update_fixed() [ISR 安全 CAN 发送]
     ├─ imu:   200Hz → 置 g_flag_imu
     ├─ print: 1Hz   → 置 g_flag_print
     └─ led:   20Hz  → 置 g_flag_led
@@ -34,7 +34,7 @@ TIM6 ISR (1kHz)
 
 | 任务 | 频率 | tick 间隔 | 宏定义 |
 |------|------|-----------|--------|
-| 电机控制 | 1kHz | 1 | `DATA_UPDATE_FREQ_MOTOR = 1000` |
+| 电机控制 | 500Hz | 2 | `DATA_UPDATE_FREQ_MOTOR = 500` |
 | IMU 读取 | 200Hz | 5 | `DATA_UPDATE_FREQ_IMU = 200` |
 | 状态打印 | 1Hz | 1000 | `DATA_UPDATE_FREQ_PRINT = 1` |
 | LED 刷新 | 20Hz | 50 | `DATA_UPDATE_FREQ_LED = 20` |

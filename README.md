@@ -19,18 +19,20 @@ CurRobo/
 │   ├── Inc/                 # 外设头文件 (main.h, gpio.h, fdcan.h...)
 │   └── Src/                 # 外设源文件 (main.c, fdcan.c, tim.c...)
 ├── Robo/                    # 系统初始化管线
-│   └── pipeline.c/h         # 统一外设初始化顺序
+│   ├── pipeline.c/h         # 统一外设初始化顺序
+│   └── wheel/               # 轮式控制 (遥控器→电机速度映射)
 ├── Modules/                 # 模块化驱动库
-│   ├── cybergear/           # CyberGear 电机两层 API
-│   │   ├── cybergear_motor.c/h   驱动层 (CAN 帧收发)
-│   │   └── cybergear_control.c/h 控制层 (阻抗/PID/轨迹)
+│   ├── cybergear/           # CyberGear 运控接口
+│   │   └── cybergear_control.c/h 控制层 (阻抗/速度模式)
 │   ├── BMI088/              # BMI088 IMU SPI 驱动
 │   ├── remote_control/      # 遥控器 DBUS 协议解析
 │   └── ws2812/              # WS2812 RGB LED 驱动
 ├── App/                     # 应用层
+│   ├── task/                # 应用任务调度 (安全保护 + 工作流)
 │   └── data_update/         # TIM6 1kHz 频率调度 + 周期数据更新
 ├── BSP/                     # 板级支持包
-│   ├── bsp_can/             # FDCAN 初始化/收发
+│   ├── bsp_motor/           # CyberGear 电机驱动 (CAN 帧收发, MIT 协议)
+│   ├── bsp_can/             # FDCAN 初始化/收发 (H7 中断线路由)
 │   ├── bsp_imu/             # BMI088 中间层 (SPI + CS)
 │   ├── bsp_rc/              # 遥控器 DMA 双缓冲接收
 │   └── bsp_usart/           # USART1 调试串口
@@ -45,11 +47,12 @@ CurRobo/
 
 | 模块 | 功能说明 | 核心文件 |
 |------|---------|----------|
-| � **电机控制** | 两层 API: 驱动层 (CAN MIT 收发) + 控制层 (阻抗/PID/速度/力矩/轨迹) | `Modules/cybergear/` |
-| ⏱️ **数据更新** | TIM6 1kHz ISR 频率调度, 电机/IMU/LED/打印统一管理 | `App/data_update/` |
-| 🔄 **初始化管线** | 外设统一初始化顺序 (USART→CAN→电机→TIM6) | `Robo/pipeline.c` |
+| 🎛️ **电机控制** | 两层 API: BSP 驱动层 (CAN MIT 收发) + 控制层 (阻抗/速度模式), 500Hz | `BSP/bsp_motor/`, `Modules/cybergear/` |
+| ⏱️ **数据更新** | TIM6 1kHz ISR 频率调度, 电机(500Hz)/IMU(200Hz)/LED(20Hz) | `App/data_update/` |
+| 🔄 **初始化管线** | 外设统一初始化 (USART→RC→CAN→电机→TIM6) | `Robo/pipeline.c` |
+| 🕹️ **轮式遥控** | 遥控器通道 1 → 电机速度映射, 含安全保护 | `Robo/wheel/`, `App/task/` |
 | 🎮 **遥控器解析** | DBUS (SBUS) 协议解析, DMA 双缓冲接收 | `Modules/remote_control/`, `BSP/bsp_rc/` |
-| 🌐 **CAN 通信** | FDCAN Classic Mode, 1Mbps, 29bit 扩展帧 | `BSP/bsp_can/` |
+| 🌐 **CAN 通信** | FDCAN Classic Mode, 1Mbps, 29bit 扩展帧, H7 中断线路由 | `BSP/bsp_can/` |
 | 📐 **IMU 姿态** | BMI088 6 轴 IMU, SPI + DMA | `Modules/BMI088/`, `BSP/bsp_imu/` |
 | 💡 **RGB LED** | WS2812B 状态指示 | `Modules/ws2812/` |
 | 🔌 **调试串口** | USART1 格式化打印 | `BSP/bsp_usart/` |
