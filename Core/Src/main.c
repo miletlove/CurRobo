@@ -34,6 +34,7 @@
 #include "cybergear_control.h"
 #include "data_update.h"
 #include "bsp_usart.h"
+#include "app_task.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -53,21 +54,10 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-CyberGear_Motor_t    g_cg_motors[1];  /* 电机对象数组 (实际使用前1个) */ 
+CyberGear_Motor_t    g_cg_motors[1];  /* 电机对象数组 */
 CyberGear_CtrlNode_t g_cg_ctrl[1];
 uint8_t              g_cg_motor_count = 1;
 float gyro[3], accel[3], temp;
-
-/* ---- 测试状态机 (仅阻抗控制) ---- */
-typedef enum {
-    TEST_WAIT_ONLINE = 0,
-    TEST_ENABLE,
-    TEST_IMPEDANCE,
-} TestState_t;
-
-TestState_t g_test_state = TEST_WAIT_ONLINE;
-uint32_t    g_test_phase_tick = 0;
-#define TEST_PHASE_DURATION_MS  5000
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -125,6 +115,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   pipeline_init();
+  app_task_init();
 
   /* USER CODE END 2 */
 
@@ -136,67 +127,9 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-    /* ---- 1. 执行 TIM6 ISR 调度的周期性任务 (IMU/打印/LED) ---- */
-    data_update_execute();
-
-    /* ---- 2. 测试状态机 (每 100ms 轮询) ---- */
-    {
-        static uint32_t last_test_tick = 0;
-        uint32_t now = data_update_get_tick_ms();
-        if (now - last_test_tick >= 100)
-        {
-            last_test_tick = now;
-
-            /* 检查所有电机是否在线 */
-            uint8_t all_online = 1;
-            for (uint8_t i = 0; i < g_cg_motor_count; i++)
-            {
-                cg_ctrl_sync_online(&g_cg_ctrl[i]);
-                if (!g_cg_ctrl[i].online) all_online = 0;
-            }
-
-            switch (g_test_state)
-            {
-            case TEST_WAIT_ONLINE:
-                if (all_online)
-                {
-                    usart1_print("Motor online!\r\n");
-                    g_test_state = TEST_ENABLE;
-                }
-                break;
-
-            case TEST_ENABLE:
-                usart1_print("Enabling Motor[0]...\r\n");
-                cg_ctrl_enable(&g_cg_ctrl[0]);
-                HAL_Delay(2);
-
-                /* 阻抗控制: K=40, D=3, 锁定当前位置 */
-                cg_ctrl_set_impedance(&g_cg_ctrl[0], 0.18f, 0.05f);
-
-                /* 以当前位置为目标位置, 电机将抵抗偏离 */
-                float cur_pos = g_cg_motors[0].feedback.position;
-                cg_ctrl_set_target(&g_cg_ctrl[0], cur_pos, 0.0f, 0.00f);
-
-                g_test_state = TEST_IMPEDANCE;
-                g_test_phase_tick = now;
-                usart1_print(">>> IMPEDANCE HOLD (K=40 D=3, hold pos=%.2f rad)\r\n", cur_pos);
-                usart1_print(">>> Try turning the rotor by hand!\r\n");
-                break;
-
-            case TEST_IMPEDANCE:
-                /* 保持目标位置不变, 阻抗控制自动产生回复力矩 */
-                /* τ = K·(θ_des - θ) + D·(0 - ω) */
-                /* 偏离越大 → 力矩越大, 类似弹簧 */
-                break;
-
-            default:
-                break;
-            } /* end switch */
-        }
-    }
-
-  /* USER CODE END 3 */
+    app_task_run();
   }
+  /* USER CODE END 3 */
 }
 
 /**

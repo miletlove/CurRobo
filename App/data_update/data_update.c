@@ -57,7 +57,60 @@ extern float                gyro[3], accel[3], temp;
  *        执行业务逻辑 (ISR 安全) 或 置标志 (非 ISR 安全)
  *    }
  * ================================================================ */
+/**
+ * @brief  主循环中调用 — 消费 ISR 设置的标志, 在安全上下文中执行
+ *
+ *  函数功能:
+ *    检查并消费各任务标志:
+ *      - g_flag_imu   → BMI088_read()     [SPI 阻塞]
+ *      - g_flag_print → 状态打印           [UART 阻塞]
+ *      - g_flag_led   → WS2812_Rainbow()   [非 ISR 安全]
+ *
+ *  调用上下文:
+ *    主循环 while(1) 中, 非 ISR 上下文.
+ *    所有阻塞操作 (SPI/UART/HAL_Delay) 在此安全执行.
+ *
+ *  函数参数:
+ *    无 (通过外部全局变量访问)
+ *
+ *  函数输出:
+ *    - gyro[], accel[], temp 更新为最新 IMU 数据
+ *    - 串口输出当前状态
+ *    - WS2812 灯效刷新
+ */
+void data_update_execute(void)
+{
 
+    /* ---- IMU 读取 (200Hz) ---- */
+    if (g_flag_imu)
+    {
+        g_flag_imu = 0;
+        BMI088_read(gyro, accel, &temp);
+    }
+
+    /* ---- 状态打印 (1Hz) ---- */
+    if (g_flag_print)
+    {
+        g_flag_print = 0;
+        /* 周期打印已禁用, 需要时取消注释 */
+        // usart1_print("[%5lu] | "
+        //              "M0 p=%.2f v=%.2f t=%.2f temp=%.1f | "
+        //              "IMU gz=%.2f\r\n",
+        //              now,
+        //              g_cg_motors[0].feedback.position,
+        //              g_cg_motors[0].feedback.velocity,
+        //              g_cg_motors[0].feedback.torque,
+        //              g_cg_motors[0].feedback.temperature,
+        //              gyro[2]);
+    }
+
+    /* ---- LED 刷新 (20Hz) ---- */
+    if (g_flag_led)
+    {
+        g_flag_led = 0;
+        WS2812_Rainbow(3);
+    }
+}
 /**
  * @brief  电机控制任务 (1kHz, ISR 内直接执行)
  *
@@ -76,8 +129,10 @@ static void data_update_task_motor(void)
     for (uint8_t i = 0; i < g_cg_motor_count; i++)
     {
         cg_ctrl_sync_online(&g_cg_ctrl[i]);
-        if (!g_cg_ctrl[i].online || !g_cg_ctrl[i].enabled) continue;
-        cg_ctrl_update_fixed(&g_cg_ctrl[i], 0.001f);  /* dt = 1ms */
+        /* 仅检查使能状态; online 仅用于监控, 不阻塞控制回路.
+           电机需要持续 MIT 帧才能维持反馈, 阻塞会导致死锁. */
+        if (!g_cg_ctrl[i].enabled) continue;
+        cg_ctrl_update_fixed(&g_cg_ctrl[i], 0.002f);  /* dt = 2ms (500Hz) */
     }
 }
 
@@ -184,57 +239,4 @@ void data_update_dispatch(void)
     data_update_task_led();
 }
 
-/**
- * @brief  主循环中调用 — 消费 ISR 设置的标志, 在安全上下文中执行
- *
- *  函数功能:
- *    检查并消费各任务标志:
- *      - g_flag_imu   → BMI088_read()     [SPI 阻塞]
- *      - g_flag_print → 状态打印           [UART 阻塞]
- *      - g_flag_led   → WS2812_Rainbow()   [非 ISR 安全]
- *
- *  调用上下文:
- *    主循环 while(1) 中, 非 ISR 上下文.
- *    所有阻塞操作 (SPI/UART/HAL_Delay) 在此安全执行.
- *
- *  函数参数:
- *    无 (通过外部全局变量访问)
- *
- *  函数输出:
- *    - gyro[], accel[], temp 更新为最新 IMU 数据
- *    - 串口输出当前状态
- *    - WS2812 灯效刷新
- */
-void data_update_execute(void)
-{
-    uint32_t now = g_sys_tick_ms;
 
-    /* ---- IMU 读取 (200Hz) ---- */
-    if (g_flag_imu)
-    {
-        g_flag_imu = 0;
-        BMI088_read(gyro, accel, &temp);
-    }
-
-    /* ---- 状态打印 (1Hz) ---- */
-    if (g_flag_print)
-    {
-        g_flag_print = 0;
-        usart1_print("[%5lu] | "
-                     "M0 p=%.2f v=%.2f t=%.2f temp=%.1f | "
-                     "IMU gz=%.2f\r\n",
-                     now,
-                     g_cg_motors[0].feedback.position,
-                     g_cg_motors[0].feedback.velocity,
-                     g_cg_motors[0].feedback.torque,
-                     g_cg_motors[0].feedback.temperature,
-                     gyro[2]);
-    }
-
-    /* ---- LED 刷新 (20Hz) ---- */
-    if (g_flag_led)
-    {
-        g_flag_led = 0;
-        WS2812_Rainbow(3);
-    }
-}

@@ -178,10 +178,10 @@ void cg_motor_parse_feedback(uint32_t ext_id, const uint8_t *data,
     fb->torque      = cg_uint_to_float(t_raw,   CG_T_MIN, CG_T_MAX);
     fb->temperature = (float)temp_raw * 0.1f;   /* 温度 x10 -> degree C */
 
-    /* 从扩展 ID 的 data 字段提取 fault 和 mode (CyberData.md 八) */
-    uint16_t id_data = (uint16_t)((ext_id >> 8) & 0xFFFF);
-    fb->fault       = (uint8_t)((id_data >> 8) & 0x3F);   /* bit16-21 */
-    fb->mode_state  = (uint8_t)(id_data & 0x03);           /* 低 2 位   */
+    /* 从扩展 ID 提取 fault 和 mode (反馈帧专用布局) */
+    /* Bit8-15: 电机 CAN ID | Bit16-21: 故障码 | Bit22-23: 模式状态 */
+    fb->fault       = (uint8_t)((ext_id >> 16) & 0x3F);   /* bit16-21: 故障码    */
+    fb->mode_state  = (uint8_t)((ext_id >> 22) & 0x03);   /* bit22-23: 模式状态  */
 }
 
 /* ================================================================
@@ -243,8 +243,8 @@ static void cg_rx_handler(uint32_t ext_id, uint8_t *data, uint8_t len,
 {
     if (len < 8) return;   /* CyberGear 固定 8 字节 */
 
-    uint8_t type     = (uint8_t)((ext_id >> 24) & 0x1F);   /* bit24-28 */
-    uint8_t motor_id = (uint8_t)((ext_id >> 8) & 0x0F);           /* bit8-15   */
+    uint8_t type     = (uint8_t)((ext_id >> 24) & 0x1F);   /* bit24-28: 通信类型 */
+    uint8_t motor_id = (uint8_t)((ext_id >> 8) & 0xFF);    /* bit8-15:  电机 CAN ID */
 
     CyberGear_Motor_t *motor = cg_find_motor(motor_id, hcan);
     if (motor == NULL) return;

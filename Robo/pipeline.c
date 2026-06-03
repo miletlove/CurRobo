@@ -83,12 +83,7 @@ void pipeline_init(void)
                      i, g_cg_motors[i].motor_id);
     }
 
-    /* 设置运行模式为 MIT */
-    for (uint8_t i = 0; i < g_cg_motor_count; i++)
-    {
-        cg_motor_set_run_mode(&g_cg_motors[i], CG_RUN_MIT);
-    }
-    HAL_Delay(10);  /* 等待模式切换生效 */
+    /* MIT 模式是电机上电默认, 无需显式设置, 省去 1 帧/电机 */
 
     /* ---- 7. TIM6 1kHz 定时器 (最后启动) ---- */
     data_update_init();

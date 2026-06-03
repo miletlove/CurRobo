@@ -1,3 +1,11 @@
+/*
+ * @Author: Yangzhi_Liu 3068126392@qq.com
+ * @Date: 2026-06-03 22:16:58
+ * @LastEditors: Yangzhi_Liu 3068126392@qq.com
+ * @LastEditTime: 2026-06-04 01:16:36
+ * @FilePath: \CurRobo\App\data_update\data_update.h
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 /**
  * @file    data_update.h
  * @brief   系统数据更新模块 — TIM6 1kHz 中断驱动的频率调度与数据更新
@@ -36,13 +44,13 @@ extern "C" {
 /* ================================================================
  *  任务更新频率定义 (Hz)
  * ================================================================ */
-#define DATA_UPDATE_FREQ_MOTOR   1000    /* 电机控制:   1kHz  */
+#define DATA_UPDATE_FREQ_MOTOR   500     /* 电机控制:   500Hz (4电机 CAN负载 52%) */
 #define DATA_UPDATE_FREQ_IMU     200     /* IMU 读取:   200Hz */
 #define DATA_UPDATE_FREQ_PRINT   1       /* 状态打印:   1Hz   */
 #define DATA_UPDATE_FREQ_LED     20      /* WS2812:     20Hz  */
 
 /* 频率 → tick 间隔换算 (tick = 1ms) */
-#define DATA_UPDATE_TICK_MOTOR   (1000 / DATA_UPDATE_FREQ_MOTOR)   /* 1    */
+#define DATA_UPDATE_TICK_MOTOR   (1000 / DATA_UPDATE_FREQ_MOTOR)   /* 2ms */
 #define DATA_UPDATE_TICK_IMU     (1000 / DATA_UPDATE_FREQ_IMU)     /* 5    */
 #define DATA_UPDATE_TICK_PRINT   (1000 / DATA_UPDATE_FREQ_PRINT)   /* 1000 */
 #define DATA_UPDATE_TICK_LED     (1000 / DATA_UPDATE_FREQ_LED)     /* 50   */
