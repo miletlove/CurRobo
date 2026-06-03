@@ -54,8 +54,8 @@ extern uint8_t              g_cg_motor_count;
  */
 void pipeline_init(void)
 {
-    /* ---- 1. 启动横幅 ---- */
-    usart1_print("\r\n==== CurRobo ====\r\n");
+    /* ---- 1. 调试串口 ---- */
+    // usart1_print("\r\n======== CurRobo ========\r\n");
 
     /* ---- 2. 遥控器 ---- */
     remote_control_init();
@@ -64,9 +64,12 @@ void pipeline_init(void)
     can_power(ENABLE);
 
     /* ---- 4. BMI088 IMU ---- */
+    // usart1_print("BMI088 init... ");
+    // if (BMI088_init() == 0) usart1_print("OK\r\n");
+    // else usart1_print("FAILED\r\n");
     BMI088_init();
 
-    /* ---- 5. CAN 总线 ---- */
+    /* ---- 5. CAN 总线 ---- (FDCAN 调试信息在 can_bsp_init 内打印) */
     can_bsp_init();
 
     /* ---- 6. 电机初始化 ---- */
@@ -76,6 +79,6 @@ void pipeline_init(void)
         cg_ctrl_init(&g_cg_ctrl[i], &g_cg_motors[i]);
     }
 
-    /* ---- 7. TIM6 500Hz 定时器 ---- */
+    /* ---- 7. TIM6 1kHz 定时器 (最后启动) ---- */
     data_update_init();
 }
