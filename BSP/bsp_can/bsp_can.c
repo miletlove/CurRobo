@@ -52,7 +52,17 @@ void can_bsp_init(void)
     /* 步骤1: 配置滤波器 (必须在 Start 之前, FDCAN 处于 INIT 模式) */
     can_filter_init();
 
-    /* 步骤2: 启动 FDCAN1 & FDCAN2 */
+    /* 步骤2: 配置中断线路由 — 必须在 Start 之前 (ILS 寄存器仅 INIT 模式可写)
+     * FDCAN 有 IT0/IT1 两条中断线, 必须显式将 RX FIFO0 路由到 IT0,
+     * 匹配 FDCANx_IT0_IRQHandler. */
+    HAL_FDCAN_ConfigInterruptLines(&hfdcan1,
+                                   FDCAN_IT_RX_FIFO0_NEW_MESSAGE,
+                                   FDCAN_INTERRUPT_LINE0);
+    HAL_FDCAN_ConfigInterruptLines(&hfdcan2,
+                                   FDCAN_IT_RX_FIFO0_NEW_MESSAGE,
+                                   FDCAN_INTERRUPT_LINE0);
+
+    /* 步骤3: 启动 FDCAN1 & FDCAN2 (退出 INIT 模式, 进入 Normal 模式) */
     if (HAL_FDCAN_Start(&hfdcan1) != HAL_OK)
     {
         Error_Handler();
@@ -62,17 +72,7 @@ void can_bsp_init(void)
         Error_Handler();
     }
 
-    /* 步骤3: 配置中断线路由 — H7 关键步骤!
-     * FDCAN 有 IT0/IT1 两条中断线, 默认 RX FIFO0 可能路由到 IT1.
-     * 必须显式将所有 RX 中断路由到 IT0, 匹配 FDCANx_IT0_IRQHandler. */
-    HAL_FDCAN_ConfigInterruptLines(&hfdcan1,
-                                   FDCAN_IT_RX_FIFO0_NEW_MESSAGE,
-                                   FDCAN_INTERRUPT_LINE0);
-    HAL_FDCAN_ConfigInterruptLines(&hfdcan2,
-                                   FDCAN_IT_RX_FIFO0_NEW_MESSAGE,
-                                   FDCAN_INTERRUPT_LINE0);
-
-    /* 步骤4: 使能接收中断通知 */
+    /* 步骤4: 使能接收中断通知 (IE 寄存器, Normal 模式可写) */
     HAL_FDCAN_ActivateNotification(&hfdcan1,
                                    FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
     HAL_FDCAN_ActivateNotification(&hfdcan2,
