@@ -87,17 +87,13 @@ void can_bsp_init(void)
     HAL_FDCAN_ActivateNotification(&hfdcan2,
                                    FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
 
-    /* ---- DEBUG: 回读寄存器确认配置 ---- */
-    uint32_t ils1 = hfdcan1.Instance->ILS;
-    uint32_t ie1  = hfdcan1.Instance->IE;
-    uint32_t ils2 = hfdcan2.Instance->ILS;
-    uint32_t ie2  = hfdcan2.Instance->IE;
-    usart1_print("[DBG] FDCAN1 ILS=0x%08lX IE=0x%08lX | FDCAN2 ILS=0x%08lX IE=0x%08lX\r\n",
-                 ils1, ie1, ils2, ie2);
-    usart1_print("[DBG] FDCAN1_IT0_IRQn enabled=%d, pending=%d\r\n",
+    /* ---- DEBUG: 回读寄存器, 合并为一次打印避免串口竞争 ---- */
+    usart1_print("[DBG] ILS1=0x%08lX IE1=0x%08lX ILS2=0x%08lX IE2=0x%08lX NVIC_en=%d FIFO1=%lu FIFO2=%lu\r\n",
+                 hfdcan1.Instance->ILS,
+                 hfdcan1.Instance->IE,
+                 hfdcan2.Instance->ILS,
+                 hfdcan2.Instance->IE,
                  NVIC_GetEnableIRQ(FDCAN1_IT0_IRQn),
-                 NVIC_GetPendingIRQ(FDCAN1_IT0_IRQn));
-    usart1_print("[DBG] RX FIFO0 fill: CAN1=%lu CAN2=%lu\r\n",
                  HAL_FDCAN_GetRxFifoFillLevel(&hfdcan1, FDCAN_RX_FIFO0),
                  HAL_FDCAN_GetRxFifoFillLevel(&hfdcan2, FDCAN_RX_FIFO0));
 }
