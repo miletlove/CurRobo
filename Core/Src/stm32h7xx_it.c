@@ -253,7 +253,8 @@ void DMA1_Stream2_IRQHandler(void)
 void FDCAN1_IT0_IRQHandler(void)
 {
   /* USER CODE BEGIN FDCAN1_IT0_IRQn 0 */
-
+  extern volatile uint32_t g_dbg_can1_rx_irq_cnt;
+  g_dbg_can1_rx_irq_cnt++;
   /* USER CODE END FDCAN1_IT0_IRQn 0 */
   HAL_FDCAN_IRQHandler(&hfdcan1);
   /* USER CODE BEGIN FDCAN1_IT0_IRQn 1 */

@@ -4,6 +4,15 @@
  * @note    基于 CtrBoard-H7_ALL/Bsp/bsp_can.c, 适配扩展帧 + CyberGear
  */
 #include "bsp_can.h"
+#include "bsp_usart.h"
+
+/* ================================================================
+ *  调试计数器 (ISR 中递增, 主循环读取)
+ * ================================================================ */
+volatile uint32_t g_dbg_can1_rx_cb_cnt = 0;  /* FDCAN1 回调计数 */
+volatile uint32_t g_dbg_can2_rx_cb_cnt = 0;  /* FDCAN2 回调计数 */
+volatile uint32_t g_dbg_can1_rx_irq_cnt = 0; /* FDCAN1 ISR 计数 */
+volatile uint32_t g_dbg_fb_parsed_cnt = 0;   /* 反馈帧解析成功计数 */
 
 /* ================================================================
  *  滤波器初始化 — 扩展帧, 初期接受全部 ID
@@ -77,6 +86,20 @@ void can_bsp_init(void)
                                    FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
     HAL_FDCAN_ActivateNotification(&hfdcan2,
                                    FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
+
+    /* ---- DEBUG: 回读寄存器确认配置 ---- */
+    uint32_t ils1 = hfdcan1.Instance->ILS;
+    uint32_t ie1  = hfdcan1.Instance->IE;
+    uint32_t ils2 = hfdcan2.Instance->ILS;
+    uint32_t ie2  = hfdcan2.Instance->IE;
+    usart1_print("[DBG] FDCAN1 ILS=0x%08lX IE=0x%08lX | FDCAN2 ILS=0x%08lX IE=0x%08lX\r\n",
+                 ils1, ie1, ils2, ie2);
+    usart1_print("[DBG] FDCAN1_IT0_IRQn enabled=%d, pending=%d\r\n",
+                 NVIC_GetEnableIRQ(FDCAN1_IT0_IRQn),
+                 NVIC_GetPendingIRQ(FDCAN1_IT0_IRQn));
+    usart1_print("[DBG] RX FIFO0 fill: CAN1=%lu CAN2=%lu\r\n",
+                 HAL_FDCAN_GetRxFifoFillLevel(&hfdcan1, FDCAN_RX_FIFO0),
+                 HAL_FDCAN_GetRxFifoFillLevel(&hfdcan2, FDCAN_RX_FIFO0));
 }
 
 /*
@@ -186,6 +209,12 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan,
 {
     if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) == 0)
         return;
+
+    /* DEBUG: 确认回调被调用 */
+    if (hfdcan == &hfdcan1)
+        g_dbg_can1_rx_cb_cnt++;
+    else if (hfdcan == &hfdcan2)
+        g_dbg_can2_rx_cb_cnt++;
 
     uint32_t ext_id;
     uint8_t  rx_buf[8];

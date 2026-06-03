@@ -15,6 +15,14 @@ extern "C" {
 #endif
 
 /* ================================================================
+ *  调试计数器 (ISR 安全递增, 主循环只读)
+ * ================================================================ */
+extern volatile uint32_t g_dbg_can1_rx_irq_cnt;  /* FDCAN1 IT0 ISR 计数 */
+extern volatile uint32_t g_dbg_can1_rx_cb_cnt;   /* FDCAN1 RxCallback 计数 */
+extern volatile uint32_t g_dbg_can2_rx_cb_cnt;   /* FDCAN2 RxCallback 计数 */
+extern volatile uint32_t g_dbg_fb_parsed_cnt;    /* 反馈帧解析成功计数 */
+
+/* ================================================================
  *  API 函数
  * ================================================================ */
 

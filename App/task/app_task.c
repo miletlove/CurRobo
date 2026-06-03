@@ -28,6 +28,7 @@
 #include "app_task.h"
 #include "data_update.h"
 #include "wheel.h"
+#include "fdcan.h"
 #include "cybergear_control.h"
 #include "remote_control.h"
 #include "bsp_usart.h"
@@ -94,6 +95,32 @@ void app_task_run(void)
 
     /* ---- 2. 轮式控制更新 ---- */
     app_task_wheel_update();
+
+    /* ---- 3. DEBUG: 每 2 秒打印 FDCAN 诊断 ---- */
+    {
+        static uint32_t last_dbg_tick = 0;
+        uint32_t now = data_update_get_tick_ms();
+        if (now - last_dbg_tick >= 2000)
+        {
+            last_dbg_tick = now;
+
+            /* 外部调试计数器 (定义在 bsp_can.c / stm32h7xx_it.c / cybergear_motor.c) */
+            extern volatile uint32_t g_dbg_can1_rx_irq_cnt;
+            extern volatile uint32_t g_dbg_can1_rx_cb_cnt;
+            extern volatile uint32_t g_dbg_fb_parsed_cnt;
+            extern FDCAN_HandleTypeDef hfdcan1;
+
+            uint32_t fifo_fill = HAL_FDCAN_GetRxFifoFillLevel(&hfdcan1, FDCAN_RX_FIFO0);
+
+            usart1_print("[DBG] IRQ=%lu CB=%lu FB=%lu FIFO=%lu online=%d en=%d\r\n",
+                         g_dbg_can1_rx_irq_cnt,
+                         g_dbg_can1_rx_cb_cnt,
+                         g_dbg_fb_parsed_cnt,
+                         fifo_fill,
+                         g_cg_ctrl[0].online,
+                         g_cg_ctrl[0].enabled);
+        }
+    }
 }
 
 /* ================================================================

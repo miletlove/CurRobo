@@ -254,6 +254,9 @@ static void cg_rx_handler(uint32_t ext_id, uint8_t *data, uint8_t len,
     case CG_TYPE_FEEDBACK:   /* type=2: 电机反馈 */
         cg_motor_parse_feedback(ext_id, data, &motor->feedback);
         motor->online       = 1;
+        /* DEBUG: 反馈解析成功 */
+        extern volatile uint32_t g_dbg_fb_parsed_cnt;
+        g_dbg_fb_parsed_cnt++;
         cg_motor_on_feedback(motor);   /* 通知应用层 */
         break;
 
