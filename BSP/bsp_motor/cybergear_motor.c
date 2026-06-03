@@ -288,11 +288,14 @@ static void cg_rx_handler(uint32_t ext_id, uint8_t *data, uint8_t len,
     }
 }
 
+volatile uint32_t g_dbg_strong_cb_cnt = 0;    /* 强符号 can1_rx_callback 调用计数 */
+
 /* ================================================================
  *  重写弱回调 — 链接时自动替换 BSP 中的空实现
  * ================================================================ */
 void can1_rx_callback(uint32_t ext_id, uint8_t *data, uint8_t len)
 {
+    g_dbg_strong_cb_cnt++;  /* 确认强符号被链接 */
     cg_rx_handler(ext_id, data, len, &hfdcan1);
 }
 

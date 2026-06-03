@@ -109,19 +109,19 @@ void app_task_run(void)
             extern volatile uint32_t g_dbg_rx_got_cnt;
             extern volatile uint32_t g_dbg_rx_first_ir;
             extern volatile uint32_t g_dbg_rx_last_ir;
+            extern volatile uint32_t g_dbg_strong_cb_cnt;
             extern FDCAN_HandleTypeDef hfdcan1;
 
             uint32_t fifo_fill = HAL_FDCAN_GetRxFifoFillLevel(&hfdcan1, FDCAN_RX_FIFO0);
 
-            usart1_print("[DBG] I=%lu C=%lu H=%lu FB=%lu E=%lu G=%lu IR1=0x%08lX IRn=0x%08lX F=%lu on=%d\r\n",
+            usart1_print("[DBG] I=%lu C=%lu S=%lu H=%lu FB=%lu G=%lu IR1=0x%08lX F=%lu on=%d\r\n",
                          g_dbg_can1_rx_irq_cnt,
                          g_dbg_can1_rx_cb_cnt,
+                         g_dbg_strong_cb_cnt,
                          g_dbg_rx_handler_cnt,
                          g_dbg_fb_parsed_cnt,
-                         g_dbg_rx_empty_cnt,
                          g_dbg_rx_got_cnt,
                          g_dbg_rx_first_ir,
-                         g_dbg_rx_last_ir,
                          fifo_fill,
                          g_cg_ctrl[0].online);
         }
