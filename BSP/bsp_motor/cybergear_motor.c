@@ -185,14 +185,6 @@ void cg_motor_parse_feedback(uint32_t ext_id, const uint8_t *data,
 }
 
 /* ================================================================
- *  调试计数器
- * ================================================================ */
-volatile uint32_t g_dbg_rx_handler_cnt  = 0;  /* 进入 cg_rx_handler 的总帧数 */
-volatile uint32_t g_dbg_rx_no_motor_cnt = 0;  /* motor 未匹配 */
-volatile uint32_t g_dbg_rx_type_unk_cnt = 0;  /* 未知 type */
-volatile uint32_t g_dbg_rx_first_type    = 0;  /* 首帧 type (捕获用) */
-
-/* ================================================================
  *  重写 BSP 弱回调 — 在 CAN 中断中解析 CyberGear 反馈
  *
  *  用法: 将本文件与 can_bsp.c 链接后, can1/2_rx_callback 自动生效.
@@ -254,26 +246,14 @@ static void cg_rx_handler(uint32_t ext_id, uint8_t *data, uint8_t len,
     uint8_t type     = (uint8_t)((ext_id >> 24) & 0x1F);   /* bit24-28: 通信类型 */
     uint8_t motor_id = (uint8_t)((ext_id >> 8) & 0xFF);    /* bit8-15:  电机 CAN ID */
 
-    /* DEBUG: 记录首帧信息 */
-    g_dbg_rx_handler_cnt++;
-    if (g_dbg_rx_handler_cnt == 1)
-        g_dbg_rx_first_type = type;
-
     CyberGear_Motor_t *motor = cg_find_motor(motor_id, hcan);
-    if (motor == NULL)
-    {
-        g_dbg_rx_no_motor_cnt++;
-        return;
-    }
+    if (motor == NULL) return;
 
     switch (type)
     {
     case CG_TYPE_FEEDBACK:   /* type=2: 电机反馈 */
         cg_motor_parse_feedback(ext_id, data, &motor->feedback);
         motor->online       = 1;
-        /* DEBUG: 反馈解析成功 */
-        extern volatile uint32_t g_dbg_fb_parsed_cnt;
-        g_dbg_fb_parsed_cnt++;
         cg_motor_on_feedback(motor);   /* 通知应用层 */
         break;
 
@@ -283,19 +263,15 @@ static void cg_rx_handler(uint32_t ext_id, uint8_t *data, uint8_t len,
         break;
 
     default:
-        g_dbg_rx_type_unk_cnt++;
         break;
     }
 }
-
-volatile uint32_t g_dbg_strong_cb_cnt = 0;    /* 强符号 can1_rx_callback 调用计数 */
 
 /* ================================================================
  *  重写弱回调 — 链接时自动替换 BSP 中的空实现
  * ================================================================ */
 void can1_rx_callback(uint32_t ext_id, uint8_t *data, uint8_t len)
 {
-    g_dbg_strong_cb_cnt++;  /* 确认强符号被链接 */
     cg_rx_handler(ext_id, data, len, &hfdcan1);
 }
 

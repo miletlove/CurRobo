@@ -4,20 +4,6 @@
  * @note    基于 CtrBoard-H7_ALL/Bsp/bsp_can.c, 适配扩展帧 + CyberGear
  */
 #include "bsp_can.h"
-#include "bsp_usart.h"
-
-/* ================================================================
- *  调试计数器 (ISR 中递增, 主循环读取)
- * ================================================================ */
-volatile uint32_t g_dbg_can1_rx_cb_cnt = 0;  /* FDCAN1 回调计数 */
-volatile uint32_t g_dbg_can2_rx_cb_cnt = 0;  /* FDCAN2 回调计数 */
-volatile uint32_t g_dbg_can1_rx_irq_cnt = 0; /* FDCAN1 ISR 计数 */
-volatile uint32_t g_dbg_fb_parsed_cnt = 0;   /* 反馈帧解析成功计数 */
-
-volatile uint32_t g_dbg_rx_empty_cnt = 0;    /* can_bsp_receive 返回 0 次数 */
-volatile uint32_t g_dbg_rx_got_cnt   = 0;    /* can_bsp_receive 返回 >0 次数 */
-volatile uint32_t g_dbg_rx_first_ir  = 0;    /* 首次回调时 IR 寄存器值 */
-volatile uint32_t g_dbg_rx_last_ir   = 0;    /* 最近一次 IR 寄存器值 */
 
 /* ================================================================
  *  滤波器初始化 — 扩展帧, 初期接受全部 ID
@@ -91,16 +77,6 @@ void can_bsp_init(void)
                                    FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
     HAL_FDCAN_ActivateNotification(&hfdcan2,
                                    FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
-
-    /* ---- DEBUG: 回读寄存器, 合并为一次打印避免串口竞争 ---- */
-    usart1_print("[DBG] ILS1=0x%08lX IE1=0x%08lX ILS2=0x%08lX IE2=0x%08lX NVIC_en=%d FIFO1=%lu FIFO2=%lu\r\n",
-                 hfdcan1.Instance->ILS,
-                 hfdcan1.Instance->IE,
-                 hfdcan2.Instance->ILS,
-                 hfdcan2.Instance->IE,
-                 NVIC_GetEnableIRQ(FDCAN1_IT0_IRQn),
-                 HAL_FDCAN_GetRxFifoFillLevel(&hfdcan1, FDCAN_RX_FIFO0),
-                 HAL_FDCAN_GetRxFifoFillLevel(&hfdcan2, FDCAN_RX_FIFO0));
 }
 
 /*
@@ -211,18 +187,6 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan,
     if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) == 0)
         return;
 
-    /* DEBUG: 确认回调被调用 */
-    if (hfdcan == &hfdcan1)
-        g_dbg_can1_rx_cb_cnt++;
-    else if (hfdcan == &hfdcan2)
-        g_dbg_can2_rx_cb_cnt++;
-
-    /* DEBUG: 直接读 IR 寄存器, 看是哪个中断源触发的 */
-    uint32_t ir = hfdcan->Instance->IR;
-    if (g_dbg_can1_rx_cb_cnt == 1 && hfdcan == &hfdcan1)
-        g_dbg_rx_first_ir = ir;
-    g_dbg_rx_last_ir = ir;
-
     uint32_t ext_id;
     uint8_t  rx_buf[8];
     uint8_t  len;
@@ -231,12 +195,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan,
     {
         len = can_bsp_receive(&hfdcan1, &ext_id, rx_buf);
         if (len > 0)
-        {
-            g_dbg_rx_got_cnt++;
             can1_rx_callback(ext_id, rx_buf, len);
-        }
-        else
-            g_dbg_rx_empty_cnt++;
     }
     else if (hfdcan == &hfdcan2)
     {
