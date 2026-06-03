@@ -101,14 +101,22 @@ void app_task_run(void)
             extern volatile uint32_t g_dbg_can1_rx_irq_cnt;
             extern volatile uint32_t g_dbg_can1_rx_cb_cnt;
             extern volatile uint32_t g_dbg_fb_parsed_cnt;
+            extern volatile uint32_t g_dbg_rx_handler_cnt;
+            extern volatile uint32_t g_dbg_rx_no_motor_cnt;
+            extern volatile uint32_t g_dbg_rx_type_unk_cnt;
+            extern volatile uint32_t g_dbg_rx_first_type;
             extern FDCAN_HandleTypeDef hfdcan1;
 
             uint32_t fifo_fill = HAL_FDCAN_GetRxFifoFillLevel(&hfdcan1, FDCAN_RX_FIFO0);
 
-            usart1_print("[DBG] IRQ=%lu CB=%lu FB=%lu FIFO=%lu online=%d en=%d\r\n",
+            usart1_print("[DBG] IRQ=%lu CB=%lu H=%lu FB=%lu nom=%lu unk=%lu T1=%lu FIFO=%lu on=%d en=%d\r\n",
                          g_dbg_can1_rx_irq_cnt,
                          g_dbg_can1_rx_cb_cnt,
+                         g_dbg_rx_handler_cnt,
                          g_dbg_fb_parsed_cnt,
+                         g_dbg_rx_no_motor_cnt,
+                         g_dbg_rx_type_unk_cnt,
+                         g_dbg_rx_first_type,
                          fifo_fill,
                          g_cg_ctrl[0].online,
                          g_cg_ctrl[0].enabled);

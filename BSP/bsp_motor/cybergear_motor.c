@@ -185,6 +185,14 @@ void cg_motor_parse_feedback(uint32_t ext_id, const uint8_t *data,
 }
 
 /* ================================================================
+ *  调试计数器
+ * ================================================================ */
+volatile uint32_t g_dbg_rx_handler_cnt  = 0;  /* 进入 cg_rx_handler 的总帧数 */
+volatile uint32_t g_dbg_rx_no_motor_cnt = 0;  /* motor 未匹配 */
+volatile uint32_t g_dbg_rx_type_unk_cnt = 0;  /* 未知 type */
+volatile uint32_t g_dbg_rx_first_type    = 0;  /* 首帧 type (捕获用) */
+
+/* ================================================================
  *  重写 BSP 弱回调 — 在 CAN 中断中解析 CyberGear 反馈
  *
  *  用法: 将本文件与 can_bsp.c 链接后, can1/2_rx_callback 自动生效.
@@ -246,8 +254,17 @@ static void cg_rx_handler(uint32_t ext_id, uint8_t *data, uint8_t len,
     uint8_t type     = (uint8_t)((ext_id >> 24) & 0x1F);   /* bit24-28: 通信类型 */
     uint8_t motor_id = (uint8_t)((ext_id >> 8) & 0xFF);    /* bit8-15:  电机 CAN ID */
 
+    /* DEBUG: 记录首帧信息 */
+    g_dbg_rx_handler_cnt++;
+    if (g_dbg_rx_handler_cnt == 1)
+        g_dbg_rx_first_type = type;
+
     CyberGear_Motor_t *motor = cg_find_motor(motor_id, hcan);
-    if (motor == NULL) return;
+    if (motor == NULL)
+    {
+        g_dbg_rx_no_motor_cnt++;
+        return;
+    }
 
     switch (type)
     {
@@ -266,6 +283,7 @@ static void cg_rx_handler(uint32_t ext_id, uint8_t *data, uint8_t len,
         break;
 
     default:
+        g_dbg_rx_type_unk_cnt++;
         break;
     }
 }
