@@ -54,9 +54,9 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-CyberGear_Motor_t    g_cg_motors[1];  /* 电机对象数组 */
-CyberGear_CtrlNode_t g_cg_ctrl[1];
-uint8_t              g_cg_motor_count = 1;
+CyberGear_Motor_t    g_cg_motors[4];  /* 电机对象数组: FL/RL/FR/RR */
+CyberGear_CtrlNode_t g_cg_ctrl[4];   /* 控制节点数组 */
+uint8_t              g_cg_motor_count = 4;
 float gyro[3], accel[3], temp;
 /* USER CODE END PV */
 

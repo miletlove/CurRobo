@@ -72,12 +72,20 @@ void pipeline_init(void)
     /* ---- 5. CAN 总线 ---- (FDCAN 调试信息在 can_bsp_init 内打印) */
     can_bsp_init();
 
-    /* ---- 6. 电机初始化 ---- */
-    for (uint8_t i = 0; i < g_cg_motor_count; i++)
-    {
-        cg_motor_init(&g_cg_motors[i], i + 1, &hfdcan1);
-        cg_ctrl_init(&g_cg_ctrl[i], &g_cg_motors[i]);
-    }
+    /* ---- 6. 电机初始化 (按 FDCAN 总线分配) ---- */
+    /* FDCAN1 总线: ID=1 (前左), ID=2 (后左) */
+    cg_motor_init(&g_cg_motors[0], 1, &hfdcan1);
+    cg_ctrl_init(&g_cg_ctrl[0], &g_cg_motors[0]);
+
+    cg_motor_init(&g_cg_motors[1], 2, &hfdcan1);
+    cg_ctrl_init(&g_cg_ctrl[1], &g_cg_motors[1]);
+
+    /* FDCAN2 总线: ID=3 (前右), ID=4 (后右) */
+    cg_motor_init(&g_cg_motors[2], 3, &hfdcan2);
+    cg_ctrl_init(&g_cg_ctrl[2], &g_cg_motors[2]);
+
+    cg_motor_init(&g_cg_motors[3], 4, &hfdcan2);
+    cg_ctrl_init(&g_cg_ctrl[3], &g_cg_motors[3]);
 
     /* ---- 7. TIM6 1kHz 定时器 (最后启动) ---- */
     data_update_init();

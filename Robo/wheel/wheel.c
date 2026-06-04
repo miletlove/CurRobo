@@ -1,22 +1,42 @@
 /**
  * @file    wheel.c
- * @brief   轮式运动模块实现 — 遥控器摇杆 → 电机速度映射
+ * @brief   四轮麦克纳姆轮运动控制模块实现 (X型布局)
  * @author  CurRobo
- * @date    2026-06-03
+ * @date    2026-06-04
  *
- * @note    调用链路:
+ * @note    控制链路:
  *            main() while(1)
- *              → wheel_update()
- *                → 读取 remote_ctrl.rc.ch[0]
- *                → 线性映射 target_velocity = (ch1 / 660) × 1.0 rad/s
- *                → cg_ctrl_set_target(&g_cg_ctrl[0], 0, target_vel, 0)
+ *              → app_task_run()
+ *                → app_task_wheel_update()    [安全检查: 遥控器/电机在线/使能]
+ *                  → wheel_update()           [运动学解算 + 目标写入]
  *
- *          MIT CAN 帧由 TIM6 ISR (1kHz) 中的 data_update_task_motor()
- *          → cg_ctrl_update_fixed() 自动发送, 本模块不直接操作 CAN.
+ *           CAN 帧由 TIM6 ISR (500Hz) 中的 data_update_task_motor()
+ *           → cg_ctrl_update_fixed() 自动发送, 本模块不直接操作 CAN.
+ *
+ *           X 型麦克纳姆轮逆运动学 (纯平移, 无旋转):
+ *            ┌───────────────────────────────────────────┐
+ *            │  v_fl = vx - vy    (前左, ID=1, 索引0)     │
+ *            │  v_rl = vx + vy    (后左, ID=2, 索引1)     │
+ *            │  v_fr = vx + vy    (前右, ID=3, 索引2)     │
+ *            │  v_rr = vx - vy    (后右, ID=4, 索引3)     │
+ *            │                                           │
+ *            │  vx: 前进 (+) / 后退 (-)                   │
+ *            │  vy: 左移 (+) / 右移 (-)                   │
+ *            └───────────────────────────────────────────┘
+ *
+ *           速度比例缩放:
+ *            当任一车轮合成速度超出 WHEEL_MAX_SPEED_RAD_S 时,
+ *            等比缩放所有轮速以保持运动方向, 最大合成速度不超限幅.
+ *
+ *           例如: vx=2.0, vy=2.0 → v_rl=v_fr=4.0 (超限)
+ *                 scale = 2.0/4.0 = 0.5
+ *                 → v_rl_s=v_fr_s=2.0, v_fl_s=v_rr_s=0.0
+ *                 实际运动: 45° 方向以 2.0 rad/s 移动
  */
 #include "wheel.h"
 #include "cybergear_control.h"
 #include "remote_control.h"
+#include <math.h>
 
 /* ================================================================
  *  外部引用 (main.c 定义)
@@ -24,112 +44,85 @@
 extern CyberGear_CtrlNode_t g_cg_ctrl[];
 
 /* ================================================================
- *  wheel_init — 初始化轮式控制
- *
- *  函数功能:
- *    将电机 0 (ID=1, FDCAN1) 配置为速度控制模式.
- *    速度控制律: τ = Kd·(ω_des − ω) + τ_ff
- *    其中 ω_des 由 wheel_update() 根据摇杆位置设定,
- *    Kd 为速度阻尼系数, τ_ff 为前馈力矩 (此处为 0).
- *
- *  速度模式 vs 阻抗模式:
- *    速度模式 (VELOCITY): 仅跟踪速度, 不跟踪位置.
- *      τ = Kd·(ω_des − ω)
- *      适合: 轮式运动、速度环控制
- *    阻抗模式 (IMPEDANCE): 同时跟踪位置和速度, 模拟弹簧-阻尼系统.
- *      τ = K·(θ_des − θ) + D·(ω_des − ω)
- *      适合: 足式站立、关节力矩控制
- *
- *  电机的 MIT 模式在硬件上电后默认为 MIT 运控模式 (CG_RUN_MIT=0),
- *  无需显式切换. 速度控制在 MCU 侧通过设定 Kp=0, Kd≠0 实现纯速度环.
- *
- *  函数参数:
- *    无 (通过外部全局变量 g_cg_ctrl[0] 访问)
- *
- *  函数输出:
- *    - g_cg_ctrl[0] 模式设为 CG_CTRL_MODE_VELOCITY
- *    - g_cg_ctrl[0] 速度阻尼设为 WHEEL_KD_VELOCITY (0.6)
- *    - 发送电机使能帧
- */
-void wheel_init(void)
+ *  内部辅助
+ * ================================================================ */
+
+/** 钳位值在 [-limit, +limit] 范围内 */
+static inline float clamp_sym(float x, float limit)
 {
-    /* 绑定电机 0: ID=1, FDCAN1 (在 pipeline_init() 中已完成初始化) */
-
-    /* 速度模式: Kp=0 (不跟踪位置), Kd=WHEEL_KD_VELOCITY (跟踪速度) */
-    cg_ctrl_set_velocity(&g_cg_ctrl[0], WHEEL_KD_VELOCITY);
-
-    /* 初始目标速度 = 0 */
-    cg_ctrl_set_target(&g_cg_ctrl[0], 0.0f, 0.0f, 0.0f);
-
-    /* 发送使能帧 */
-    cg_ctrl_enable(&g_cg_ctrl[0]);
+    if (x >  limit) return  limit;
+    if (x < -limit) return -limit;
+    return x;
 }
 
 /* ================================================================
- *  wheel_update — 摇杆 → 速度映射 (主循环每周期调用)
- *
- *  函数功能:
- *    读取遥控器通道 1 的当前值, 线性映射为电机目标速度.
- *
- *  映射公式:
- *    ┌─────────────────────────────────────────────────────┐
- *    │  target_velocity = (ch1 / WHEEL_RC_CH_MAX_ABS)      │
- *    │                    × WHEEL_MAX_SPEED_RAD_S           │
- *    │                                                     │
- *    │  其中:                                              │
- *    │    ch1 ∈ [-1024, +1023]  通道 1 的原始值 (中心=0)   │
- *    │    WHEEL_RC_CH_MAX_ABS = 660  (摇杆实际最大偏移)    │
- *    │    WHEEL_MAX_SPEED_RAD_S = 1.0 rad/s                │
- *    └─────────────────────────────────────────────────────┘
- *
- *  理论推导:
- *    SBUS 协议中每个通道为 11-bit (0~2047), 中位值约 1024.
- *    偏移后 ch1 = raw − 1024, 范围约 [−1024, +1023].
- *    实际摇杆机械行程限制下, 实测最大偏移约 ±660.
- *
- *    映射设计为线性比例:
- *      ω_des = (ch1 / 660) × 1.0
- *
- *    例如:
- *      ch1 =  0   → ω_des =  0.00 rad/s  (停止)
- *      ch1 = +330 → ω_des = +0.50 rad/s  (半速正转)
- *      ch1 = +660 → ω_des = +1.00 rad/s  (全速正转)
- *      ch1 = −330 → ω_des = −0.50 rad/s  (半速反转)
- *      ch1 = −660 → ω_des = −1.00 rad/s  (全速反转)
- *
- *    超出 [−660, +660] 的值会被钳位到 ±1.0 rad/s,
- *    避免因遥控器校准偏差导致的超速.
- *
- *  调用时机:
- *    主循环 while(1) 中, 每周期调用 (后台由 1kHz TIM6 ISR 发送 CAN 帧).
- *    无需在本函数中做频率控制, 因为 cg_ctrl_set_target() 仅写内存,
- *    CAN 发送由 data_update_task_motor() 按 1kHz 独立调度.
- *
- *  函数参数:
- *    无
- *
- *  函数输出:
- *    - g_cg_ctrl[0].target_velocity 被更新为摇杆映射后的目标速度
- *    - 下一个 TIM6 中断 (1ms 内) 自动发送 MIT CAN 帧到电机
- */
+ *  wheel_init — 四轮初始化
+ * ================================================================ */
+void wheel_init(void)
+{
+    for (uint8_t i = 0; i < WHEEL_MOTOR_COUNT; i++)
+    {
+        /* 速度模式: Kp=0 (不跟踪位置), Kd=WHEEL_KD_VELOCITY (跟踪速度) */
+        cg_ctrl_set_velocity(&g_cg_ctrl[i], WHEEL_KD_VELOCITY);
+
+        /* 初始目标速度 = 0 */
+        cg_ctrl_set_target(&g_cg_ctrl[i], 0.0f, 0.0f, 0.0f);
+
+        /* 发送使能帧 */
+        cg_ctrl_enable(&g_cg_ctrl[i]);
+    }
+}
+
+/* ================================================================
+ *  wheel_update — 摇杆 → 四轮速度映射
+ * ================================================================ */
 void wheel_update(void)
 {
-    /* 1. 读取遥控器通道 1 */
-    int16_t ch1 = remote_ctrl.rc.ch[0];
+    /* 1. 读取遥控器通道
+     *    ch[0]: 前进 (+)/后退 (-), 对应 vx
+     *    ch[1]: 左移 (+)/右移 (-), 对应 vy
+     *    注意: SBUS 协议中通道值已减去 1024 中位偏移
+     */
+    int16_t ch0 = remote_ctrl.rc.ch[0];
+    int16_t ch1 = remote_ctrl.rc.ch[1];
 
-    /* 2. 线性映射: ch1 → target_velocity (rad/s) */
-    float target_velocity = (float)ch1 / (float)WHEEL_RC_CH_MAX_ABS
-                            * WHEEL_MAX_SPEED_RAD_S;
+    /* 2. 线性映射: RC 原始值 → 车身目标速度 (rad/s)
+     *    vx = (ch0 / 660) × 2.0
+     *    vy = (ch1 / 660) × 2.0
+     */
+    float vx = (float)ch0 / (float)WHEEL_RC_CH_MAX_ABS * WHEEL_MAX_SPEED_RAD_S;
+    float vy = (float)ch1 / (float)WHEEL_RC_CH_MAX_ABS * WHEEL_MAX_SPEED_RAD_S;
 
-    /* 3. 钳位到 [-1.0, +1.0] rad/s */
-    if (target_velocity >  WHEEL_MAX_SPEED_RAD_S)
-        target_velocity =  WHEEL_MAX_SPEED_RAD_S;
-    if (target_velocity < -WHEEL_MAX_SPEED_RAD_S)
-        target_velocity = -WHEEL_MAX_SPEED_RAD_S;
+    /* 钳位: 单个摇杆方向不超限 */
+    vx = clamp_sym(vx, WHEEL_MAX_SPEED_RAD_S);
+    vy = clamp_sym(vy, WHEEL_MAX_SPEED_RAD_S);
 
-    /* 4. 更新控制目标 (仅写内存, CAN 帧由 TIM6 ISR 发送) */
-    cg_ctrl_set_target(&g_cg_ctrl[0],
-                       0.0f,              /* position: 速度模式不跟踪位置 */
-                       target_velocity,   /* velocity: 摇杆映射的目标速度 */
-                       0.0f);             /* torque_ff: 无前馈力矩 */
+    /* 3. X 型麦克纳姆轮逆运动学: 车身速度 → 各轮速度 */
+    float v_fl =  vx - vy;    /* 前左 (ID=1, 索引0) */
+    float v_rl =  vx + vy;    /* 后左 (ID=2, 索引1) */
+    float v_fr =  vx + vy;    /* 前右 (ID=3, 索引2) */
+    float v_rr =  vx - vy;    /* 后右 (ID=4, 索引3) */
+
+    /* 4. 等比缩放: 当任一车轮速度超出限幅时, 整体等比缩放
+     *    保证运动方向不变, 仅等比例降低速度
+     */
+    float max_abs = fabsf(v_fl);
+    if (fabsf(v_rl) > max_abs) max_abs = fabsf(v_rl);
+    if (fabsf(v_fr) > max_abs) max_abs = fabsf(v_fr);
+    if (fabsf(v_rr) > max_abs) max_abs = fabsf(v_rr);
+
+    if (max_abs > WHEEL_MAX_SPEED_RAD_S)
+    {
+        float scale = WHEEL_MAX_SPEED_RAD_S / max_abs;
+        v_fl *= scale;
+        v_rl *= scale;
+        v_fr *= scale;
+        v_rr *= scale;
+    }
+
+    /* 5. 更新各电机控制目标 (仅写内存, CAN 帧由 TIM6 ISR 发送) */
+    cg_ctrl_set_target(&g_cg_ctrl[WHEEL_MOTOR_FL], 0.0f, v_fl, 0.0f);
+    cg_ctrl_set_target(&g_cg_ctrl[WHEEL_MOTOR_RL], 0.0f, v_rl, 0.0f);
+    cg_ctrl_set_target(&g_cg_ctrl[WHEEL_MOTOR_FR], 0.0f, v_fr, 0.0f);
+    cg_ctrl_set_target(&g_cg_ctrl[WHEEL_MOTOR_RR], 0.0f, v_rr, 0.0f);
 }

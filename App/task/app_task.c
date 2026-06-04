@@ -1,8 +1,8 @@
 /**
  * @file    app_task.c
- * @brief   应用任务调度模块实现 — 遥控器→电机控制工作流
+ * @brief   应用任务调度模块实现 — 遥控器→四轮麦克纳姆轮控制工作流
  * @author  CurRobo
- * @date    2026-06-03
+ * @date    2026-06-04
  *
  * @note    本模块是应用层入口, 连接 BSP 层 (电机/CAN) 和 Robo 层 (控制算法).
  *
@@ -12,15 +12,23 @@
  *          ├─────────────┤
  *          │ pipeline    │  CAN/IMU/电机绑定/TIM6 启动
  *          ├─────────────┤
- *          │ app_task    │  wheel_init() → 电机使能 + 速度模式
+ *          │ app_task    │  wheel_init() → 4电机使能 + 速度模式
  *          ├─────────────┤
  *          │ while(1)    │
  *          │  app_task   │  data_update_execute() + wheel_update()
  *          │  run()      │  ← 每周期
  *          └─────────────┘
  *
+ *          四轮控制:
+ *            FDCAN1: 电机 ID=1 (前左), ID=2 (后左)
+ *            FDCAN2: 电机 ID=3 (前右), ID=4 (后右)
+ *
+ *            X型麦克纳姆轮逆运动学:
+ *              v_fl = vx - vy    v_rl = vx + vy
+ *              v_fr = vx + vy    v_rr = vx - vy
+ *
  *          实时性保证:
- *            - CAN 帧: TIM6 ISR (1kHz, 最高优先级)
+ *            - CAN 帧: TIM6 ISR (500Hz, 最高优先级)
  *            - 摇杆读取: 主循环 (非 ISR, 但遥控器数据由 DBUS ISR 以 ~100Hz 更新)
  *            - IMU 读取: 主循环 (200Hz 标志触发, SPI 阻塞)
  *            - 串口打印: 主循环 (1Hz 标志触发)
@@ -40,45 +48,32 @@ extern CyberGear_CtrlNode_t g_cg_ctrl[];
  *  内部状态
  * ================================================================ */
 
-/** 轮式控制在线状态标志 */
-static uint8_t wheel_was_online = 0;
+/** 四轮健康状态: 所有电机在线且使能 */
+static uint8_t wheel_all_healthy = 0;
+
+/* ================================================================
+ *  内部辅助: 停止所有电机
+ * ================================================================ */
+static void wheel_stop_all(void)
+{
+    for (uint8_t i = 0; i < WHEEL_MOTOR_COUNT; i++)
+    {
+        cg_ctrl_set_target(&g_cg_ctrl[i], 0.0f, 0.0f, 0.0f);
+    }
+}
 
 /* ================================================================
  *  app_task_init — 应用任务统一初始化
- *
- *  函数功能:
- *    在 pipeline_init() 完成 BSP 层初始化后,
- *    初始化所有应用级任务:
- *      - wheel_init(): 电机 0 切换为速度模式, 发送使能帧
- *
- *  函数参数:
- *    无
- *
- *  函数输出:
- *    - 电机 0 使能并进入速度模式
- *    - 串口打印初始化日志
- */
+ * ================================================================ */
 void app_task_init(void)
 {
-    /* 轮式控制初始化 */
+    /* 四轮麦克纳姆轮控制初始化 */
     wheel_init();
 }
 
 /* ================================================================
  *  app_task_run — 应用任务统一执行
- *
- *  函数功能:
- *    每周期在 main() while(1) 中调用, 按顺序执行:
- *      1. data_update_execute()    消费 TIM6 ISR 标志
- *      2. app_task_wheel_update()  遥控器→电机速度映射
- *
- *  函数参数:
- *    无
- *
- *  函数输出:
- *    - 各周期任务按标志消费执行
- *    - 电机速度根据摇杆实时更新
- */
+ * ================================================================ */
 void app_task_run(void)
 {
     data_update_execute();
@@ -86,53 +81,71 @@ void app_task_run(void)
 }
 
 /* ================================================================
- *  app_task_wheel_update — 轮式控制更新 (含安全保护)
- *
- *  函数功能:
- *    从遥控器读取通道 1 的值, 映射为电机目标速度.
- *    包含三层安全保护:
- *      1. 遥控器离线 → 目标速度置零
- *      2. 电机离线   → 目标速度置零
- *      3. 电机未使能 → 目标速度置零
+ *  app_task_wheel_update — 四轮控制更新 (含安全保护)
  *
  *  安全设计:
- *    当遥控器信号丢失 (remote_ctrl.online==0) 或电机通信中断时,
- *    自动将目标速度置零, 电机在速度阻尼 Kd 作用下快速停止.
- *    本函数写入的 target_velocity 在下一个 TIM6 中断 (≤1ms) 即生效.
+ *    三层保护机制, 任一条件不满足则立即将所有电机目标速度置零:
+ *      1. 遥控器离线 → 全部置零
+ *      2. 任一电机未使能 → 全部置零
+ *      3. 任一电机离线 (通信中断) → 全部置零
  *
- *  函数参数:
- *    无
+ *    四轮必须同步停止, 防止单轮失控导致车体旋转或侧翻.
  *
- *  函数输出:
- *    - g_cg_ctrl[0].target_velocity 更新
- *    - 异常状态串口提示 (仅状态变化时打印, 避免刷屏)
- */
+ *  健康状态转换:
+ *    wheel_all_healthy 在全部电机在线且使能时置 1,
+ *    在任一异常时置 0. 状态切换时通过串口打印日志.
+ * ================================================================ */
 void app_task_wheel_update(void)
 {
     /* ---------- 安全保护 1: 遥控器离线 ---------- */
     if (!remote_ctrl.online)
     {
-        cg_ctrl_set_target(&g_cg_ctrl[0], 0.0f, 0.0f, 0.0f);
-        wheel_was_online = 0;
+        wheel_stop_all();
+        if (wheel_all_healthy)
+        {
+            wheel_all_healthy = 0;
+            // LOG_WARN("WHEEL", "Remote offline, all motors stopped");
+        }
         return;
     }
 
-    /* ---------- 安全保护 2: 电机离线 ---------- */
-    if (!g_cg_ctrl[0].online)
+    /* ---------- 安全保护 2: 检查所有电机使能状态 ---------- */
+    for (uint8_t i = 0; i < WHEEL_MOTOR_COUNT; i++)
     {
-        cg_ctrl_set_target(&g_cg_ctrl[0], 0.0f, 0.0f, 0.0f);
-        wheel_was_online = 0;
-        return;
+        if (!g_cg_ctrl[i].enabled)
+        {
+            wheel_stop_all();
+            if (wheel_all_healthy)
+            {
+                wheel_all_healthy = 0;
+                // LOG_WARN("WHEEL", "Motor %d not enabled, all stopped", i + 1);
+            }
+            return;
+        }
     }
 
-    /* ---------- 安全保护 3: 电机未使能 ---------- */
-    if (!g_cg_ctrl[0].enabled)
+    /* ---------- 安全保护 3: 检查所有电机在线 ---------- */
+    for (uint8_t i = 0; i < WHEEL_MOTOR_COUNT; i++)
     {
-        cg_ctrl_set_target(&g_cg_ctrl[0], 0.0f, 0.0f, 0.0f);
-        return;
+        if (!g_cg_ctrl[i].online)
+        {
+            wheel_stop_all();
+            if (wheel_all_healthy)
+            {
+                wheel_all_healthy = 0;
+                // LOG_WARN("WHEEL", "Motor %d offline, all stopped", i + 1);
+            }
+            return;
+        }
     }
 
-    /* ---------- 正常: 摇杆 → 速度映射 ---------- */
-    wheel_was_online = 1;
+    /* ---------- 所有安全检查通过 ---------- */
+    if (!wheel_all_healthy)
+    {
+        wheel_all_healthy = 1;
+        // LOG_INFO("WHEEL", "All 4 motors healthy, control active");
+    }
+
+    /* 正常: 摇杆 → 四轮速度映射 */
     wheel_update();
 }

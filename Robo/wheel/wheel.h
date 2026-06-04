@@ -1,12 +1,28 @@
 /**
  * @file    wheel.h
- * @brief   轮式运动模块 — 遥控器通道→电机速度映射
+ * @brief   四轮麦克纳姆轮运动控制模块 (X型布局)
  * @author  CurRobo
- * @date    2026-06-03
+ * @date    2026-06-04
  *
- * @note    单电机测试用模块, 将遥控器摇杆通道线性映射为电机目标速度.
- *          摇杆通道 1 正 → 电机正转, 摇杆通道 1 负 → 电机反转.
- *          最大转速限制为 1 rad/s.
+ * @note    硬件连接:
+ *          - 电机 1 (FL, 前左): FDCAN1, ID=1
+ *          - 电机 2 (RL, 后左): FDCAN1, ID=2
+ *          - 电机 3 (FR, 前右): FDCAN2, ID=3
+ *          - 电机 4 (RR, 后右): FDCAN2, ID=4
+ *
+ *          麦克纳姆轮 X 型布局逆运动学 (纯平移):
+ *            v_fl = vx - vy    (前左, ID=1)
+ *            v_rl = vx + vy    (后左, ID=2)
+ *            v_fr = vx + vy    (前右, ID=3)
+ *            v_rr = vx - vy    (后右, ID=4)
+ *
+ *          遥控器映射:
+ *            通道 0 (ch1): 前进/后退 (vx)
+ *            通道 1 (ch2): 左移/右移 (vy)
+ *
+ *          速度方向约定:
+ *            vx > 0: 前进,  vx < 0: 后退
+ *            vy > 0: 左移,  vy < 0: 右移
  */
 #ifndef __WHEEL_H__
 #define __WHEEL_H__
@@ -21,60 +37,75 @@ extern "C" {
  *  配置宏
  * ================================================================ */
 
-/** 摇杆通道最大绝对值 (SBUS 偏移后理论值 ±1024, 实际摇杆行程约 ±660) */
-#define WHEEL_RC_CH_MAX_ABS    660
+/** 电机最大目标转速 (rad/s), 单轮限幅 */
+#define WHEEL_MAX_SPEED_RAD_S    2.0f
 
-/** 电机最大目标转速 (rad/s) */
-#define WHEEL_MAX_SPEED_RAD_S  1.0f
+/** 摇杆通道最大绝对值 (SBUS 偏移后, 实际行程约 ±660) */
+#define WHEEL_RC_CH_MAX_ABS      660
 
-/** 速度阻尼系数 Kd (Nm/(rad/s)), 值越大阻尼越强, 速度跟踪越紧 */
-#define WHEEL_KD_VELOCITY      0.6f
+/** 速度阻尼系数 Kd (Nm/(rad/s)), 值越大速度跟踪越紧 */
+#define WHEEL_KD_VELOCITY        0.6f
+
+/* ================================================================
+ *  电机索引 (与 g_cg_ctrl[] 数组索引对应)
+ * ================================================================ */
+#define WHEEL_MOTOR_FL    0    /* 前左, ID=1, FDCAN1 */
+#define WHEEL_MOTOR_RL    1    /* 后左, ID=2, FDCAN1 */
+#define WHEEL_MOTOR_FR    2    /* 前右, ID=3, FDCAN2 */
+#define WHEEL_MOTOR_RR    3    /* 后右, ID=4, FDCAN2 */
+#define WHEEL_MOTOR_COUNT 4
 
 /* ================================================================
  *  API
  * ================================================================ */
 
 /**
- * @brief  轮式模块初始化
+ * @brief  四轮模块初始化
  *
  * 函数功能:
- *   将电机 0 (ID=1, FDCAN1) 的控制模式切换为速度模式 (VELOCITY),
- *   并发送使能帧.
+ *   将全部 4 个电机配置为速度控制模式 (VELOCITY),
+ *   初始化目标速度为零, 并发送使能帧.
+ *
+ *   速度控制律: τ = Kd·(ω_des − ω) + τ_ff
+ *
+ * 调用时机:
+ *   app_task_init() 中调用, 在 pipeline_init() 之后, while(1) 之前.
  *
  * 函数参数:
  *   无 (通过外部全局变量 g_cg_ctrl[] 访问控制节点)
  *
  * 函数输出:
- *   - 电机使能
+ *   - 4 个电机全部使能
  *   - 控制模式设置为 CG_CTRL_MODE_VELOCITY
- *   - 速度阻尼 Kd 设置为 WHEEL_KD_VELOCITY
+ *   - 速度阻尼 Kd = WHEEL_KD_VELOCITY
  */
 void wheel_init(void);
 
 /**
- * @brief  轮式模块更新 (主循环每周期调用)
+ * @brief  四轮模块更新 (主循环每周期调用)
  *
  * 函数功能:
- *   读取遥控器通道 1 (remote_ctrl.rc.ch[0]) 的值,
- *   线性映射为目标速度:
+ *   读取遥控器通道 0 (前进/后退) 和通道 1 (左移/右移),
+ *   通过 X 型麦克纳姆轮逆运动学解算出各轮目标速度,
+ *   调用 cg_ctrl_set_target() 更新各电机控制目标.
  *
- *     target_velocity = (ch1 / WHEEL_RC_CH_MAX_ABS) × WHEEL_MAX_SPEED_RAD_S
+ *   实际 CAN 帧由 TIM6 ISR (500Hz) 中的 data_update_task_motor()
+ *   → cg_ctrl_update_fixed() 自动发送.
  *
- *   映射公式推导:
- *     摇杆在中位时 ch1 = 0 → target_velocity = 0 (电机停转)
- *     摇杆推到底 ch1 = +660 → target_velocity = +1.0 rad/s (正转)
- *     摇杆拉到底 ch1 = -660 → target_velocity = -1.0 rad/s (反转)
- *     中间位置线性插值: 如 ch1 = +330 → target_velocity = +0.5 rad/s
+ * 安全钳位:
+ *   当合成速度超出单轮限幅 WHEEL_MAX_SPEED_RAD_S 时,
+ *   等比缩放所有车轮速度, 保持运动方向不变.
  *
- *   映射后调用 cg_ctrl_set_target() 更新目标速度,
- *   实际的 MIT CAN 帧由 data_update_task_motor() 在 TIM6 ISR (1kHz) 中发送.
+ * 调用时机:
+ *   主循环 while(1) → app_task_run() → app_task_wheel_update()
+ *   → wheel_update() 每周期调用.
  *
  * 函数参数:
  *   无
  *
  * 函数输出:
- *   - 更新 g_cg_ctrl[0] 的目标速度
- *   - 电机按摇杆比例旋转
+ *   - g_cg_ctrl[0..3].target_velocity 被更新
+ *   - 下一个 TIM6 中断 (2ms 内) 自动发送 MIT CAN 帧
  */
 void wheel_update(void);
 
