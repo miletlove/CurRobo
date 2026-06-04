@@ -1,48 +1,60 @@
 /**
  * @file    app_task.h
- * @brief   应用任务调度模块 — 遥控器→四轮麦克纳姆轮控制工作流
+ * @brief   应用任务调度模块 — 启动FSM + 服务化调度 + 命令源路由
  * @author  CurRobo
- * @date    2026-06-04
+ * @date    2026-06-05
  *
- * @note    本模块封装了从功能初始化到任务执行的完整工作流:
- *
- *          工作流:
+ * @note    启动状态机 (FSM):
  *          ┌──────────────────────────────────────────────────┐
  *          │  app_task_init()                   [main 初始化] │
- *          │    → wheel_init()                  4电机速度模式  │
- *          │    → 等待电机上线                               │
+ *          │    → motor_service_enable_all()    [首次使能]     │
+ *          │    → can_service_init()            [CAN 监控]     │
  *          │                                                 │
  *          │  while(1) {                        [主循环]      │
  *          │    app_task_run()                               │
- *          │      → data_update_execute()       [TIM6 标志消费]│
- *          │      → app_task_wheel_update()     [摇杆→四轮速度]│
+ *          │      → data_update_execute()       [TIM6 标志]   │
+ *          │      → motor_service_update()      [重试/健康]   │
+ *          │      → can_service_update()        [CAN 监控]    │
+ *          │      → app_task_fsm_update()       [启动状态机]  │
+ *          │      → app_task_wheel_update()     [遥控→速度]   │
+ *          │      → watchdog_feed()             [看门狗]      │
  *          │  }                                              │
  *          └──────────────────────────────────────────────────┘
  *
- *          四轮麦克纳姆轮布局:
- *            FDCAN1: 电机 ID=1 (前左), ID=2 (后左)
- *            FDCAN2: 电机 ID=3 (前右), ID=4 (后右)
+ *          命令源路由 (为上位机预留接口):
+ *            当前由遥控器驱动 (CMD_SOURCE_RC).
+ *            未来可扩展 CMD_SOURCE_UPPER (串口/CAN 上位机指令).
+ *            MotionCommand_t 作为统一控制接口.
  *
- *          安全保护:
- *            - 遥控器离线 → 四轮全停
- *            - 任一电机未使能 → 四轮全停
- *            - 任一电机通信中断 → 四轮全停
- *
- *          分层关系:
- *            App/task/app_task   ← 本模块 (应用任务)
- *            Robo/wheel/wheel    ← 轮式控制 (运动学解算)
- *            Modules/cybergear   ← CyberGear 运控 (控制模式)
- *            BSP/bsp_motor       ← 电机驱动 (CAN 收发)
- *            BSP/bsp_can         ← CAN 总线 (硬件抽象)
+ *          服务化分层:
+ *            App/task/app_task          ← 本模块 (FSM + 调度)
+ *            Robo/services/motor_service← 电机生命周期管理
+ *            Robo/services/can_service  ← CAN 总线健康监控
+ *            Robo/services/watchdog     ← IWDG 看门狗
+ *            Robo/wheel/wheel           ← 轮式控制 (运动学)
+ *            Modules/cybergear          ← CyberGear 运控
+ *            BSP/bsp_motor              ← 电机驱动 (CAN)
+ *            BSP/bsp_can                ← CAN 总线 (硬件)
  */
 #ifndef __APP_TASK_H__
 #define __APP_TASK_H__
 
 #include "main.h"
+#include "motor_service.h"     /* MotionCommand_t 定义 */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* ================================================================
+ *  启动状态机
+ * ================================================================ */
+typedef enum {
+    APP_FSM_INIT      = 0,   /* 初始化 (首次使能已完成) */
+    APP_FSM_STARTING  = 1,   /* 启动中 (等待电机上线)  */
+    APP_FSM_READY     = 2,   /* 就绪   (正常控制)      */
+    APP_FSM_FAULT     = 3    /* 故障   (需人为干预)    */
+} AppFsmState_t;
 
 /* ================================================================
  *  API
@@ -50,7 +62,7 @@ extern "C" {
 
 void app_task_init(void);
 void app_task_run(void);
-void app_task_wheel_update(void);
+AppFsmState_t app_task_get_fsm_state(void);
 
 #ifdef __cplusplus
 }

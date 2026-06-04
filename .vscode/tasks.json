@@ -1,0 +1,95 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "E:\\STM32CubeCLT_1.21.0\\CMake\\bin\\cmake.EXE --build C:/Users/30681/Desktop/CurRobo/build/Debug --",
+			"args": []
+		},
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "E:\\STM32CubeCLT_1.21.0\\CMake\\bin\\cmake.EXE --build C:/Users/30681/Desktop/CurRobo/build/Debug --",
+			"args": []
+		},
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "E:\\STM32CubeCLT_1.21.0\\CMake\\bin\\cmake.EXE --build C:/Users/30681/Desktop/CurRobo/build/Debug --",
+			"args": []
+		},
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "E:\\STM32CubeCLT_1.21.0\\CMake\\bin\\cmake.EXE --build C:/Users/30681/Desktop/CurRobo/build/Debug --",
+			"args": []
+		},
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "E:\\STM32CubeCLT_1.21.0\\CMake\\bin\\cmake.EXE --build C:/Users/30681/Desktop/CurRobo/build/Debug --",
+			"args": []
+		},
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "E:\\STM32CubeCLT_1.21.0\\CMake\\bin\\cmake.EXE --build C:/Users/30681/Desktop/CurRobo/build/Debug --",
+			"args": []
+		},
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "E:\\STM32CubeCLT_1.21.0\\CMake\\bin\\cmake.EXE --build C:/Users/30681/Desktop/CurRobo/build/Debug --",
+			"args": []
+		},
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "E:\\STM32CubeCLT_1.21.0\\CMake\\bin\\cmake.EXE --build C:/Users/30681/Desktop/CurRobo/build/Debug --",
+			"args": []
+		},
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "E:\\STM32CubeCLT_1.21.0\\CMake\\bin\\cmake.EXE --build C:/Users/30681/Desktop/CurRobo/build/Debug --",
+			"args": []
+		},
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "E:\\STM32CubeCLT_1.21.0\\CMake\\bin\\cmake.EXE --build C:/Users/30681/Desktop/CurRobo/build/Debug --",
+			"args": []
+		},
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "E:\\STM32CubeCLT_1.21.0\\CMake\\bin\\cmake.EXE --build C:/Users/30681/Desktop/CurRobo/build/Debug --",
+			"args": []
+		},
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "E:\\STM32CubeCLT_1.21.0\\CMake\\bin\\cmake.EXE --build C:/Users/30681/Desktop/CurRobo/build/Debug --",
+			"args": []
+		},
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "E:\\STM32CubeCLT_1.21.0\\CMake\\bin\\cmake.EXE --build C:/Users/30681/Desktop/CurRobo/build/Debug --",
+			"args": []
+		},
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "E:\\STM32CubeCLT_1.21.0\\CMake\\bin\\cmake.EXE --build C:/Users/30681/Desktop/CurRobo/build/Debug --",
+			"args": []
+		},
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "E:\\STM32CubeCLT_1.21.0\\CMake\\bin\\cmake.EXE --build C:/Users/30681/Desktop/CurRobo/build/Debug --",
+			"args": []
+		}
+	]
+}

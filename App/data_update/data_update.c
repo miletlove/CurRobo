@@ -25,6 +25,7 @@
 #include "BMI088driver.h"
 #include "ws2812.h"
 #include "bsp_usart.h"
+#include "watchdog.h"
 
 /* ================================================================
  *  全局变量
@@ -192,6 +193,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     {
         g_sys_tick_ms++;
         data_update_dispatch();
+
+        /* IWDG 喂狗: TIM6 ISR 优先级最高, 不被主循环阻塞.
+           若 TIM6 也停了 → FDCAN MIT 帧也停了 → 复位是安全的. */
+#if defined(HAL_IWDG_MODULE_ENABLED)
+        watchdog_feed();
+#endif
     }
 }
 
