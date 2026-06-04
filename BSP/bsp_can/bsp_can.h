@@ -70,7 +70,7 @@ void can1_rx_callback(uint32_t ext_id, uint8_t *data, uint8_t len);
 /**
  * @brief  FDCAN2 接收回调 (同上)
  */
-__weak void can2_rx_callback(uint32_t ext_id, uint8_t *data, uint8_t len);
+void can2_rx_callback(uint32_t ext_id, uint8_t *data, uint8_t len);
 
 #ifdef __cplusplus
 }
