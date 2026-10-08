@@ -20,6 +20,9 @@ extern CyberGear_CtrlNode_t g_cg_ctrl[];
  * ================================================================ */
 static MotorServiceNode_t g_motor_srv[MOTOR_COUNT];
 
+/** 电机使能总开关 (1=允许使能, 0=关闭且禁止重试) */
+static uint8_t g_motor_enable_switch = 1;
+
 /* ================================================================
  *  motor_service_init — 绑定控制节点, 初始化状态
  * ================================================================ */
@@ -83,6 +86,28 @@ uint8_t motor_service_update(void)
 {
     uint32_t now = data_update_get_tick_ms();
     uint8_t all_online = 1;
+
+    /* ---- 使能总开关关闭: 周期性重发 STOP, 不重试使能 ---- */
+    if (!g_motor_enable_switch)
+    {
+        static uint32_t last_stop_ms = 0;
+
+        /* 每 500ms 对所有电机无条件重发 STOP 帧:
+           FDCAN AutoRetransmission=DISABLE, 单帧可能丢失,
+           重复发送确保每个电机都收到停止指令. */
+        if (now - last_stop_ms >= MOTOR_RETRY_INTERVAL_MS)
+        {
+            last_stop_ms = now;
+            for (uint8_t i = 0; i < MOTOR_COUNT; i++)
+            {
+                CyberGear_CtrlNode_t *ctrl = g_motor_srv[i].ctrl;
+                if (!ctrl) continue;
+                cg_ctrl_stop(ctrl);      /* 无条件发 STOP 帧 */
+                g_motor_srv[i].state = MOTOR_STATE_OFFLINE;
+            }
+        }
+        return 0;
+    }
 
     for (uint8_t i = 0; i < MOTOR_COUNT; i++)
     {
@@ -194,6 +219,29 @@ MotorLifeState_t motor_service_get_state(uint8_t index)
 {
     if (index >= MOTOR_COUNT) return MOTOR_STATE_OFFLINE;
     return g_motor_srv[index].state;
+}
+
+/* ================================================================
+ *  motor_service_set_enable — 电机使能总开关
+ * ================================================================ */
+void motor_service_set_enable(uint8_t en)
+{
+    uint8_t new_state = (en != 0) ? 1 : 0;
+
+    /* 仅在开关状态跳变时处理, 避免每周期重置重试计数与时间戳
+       (每周期重置会导致使能重试风暴与 ENABLING 超时失效) */
+    if (new_state == g_motor_enable_switch) return;
+    g_motor_enable_switch = new_state;
+
+    if (g_motor_enable_switch)
+    {
+        /* 恢复使能: 重置重试计数与时间戳, 确保能重新走使能流程 */
+        for (uint8_t i = 0; i < MOTOR_COUNT; i++)
+        {
+            g_motor_srv[i].enable_retries = 0;
+            g_motor_srv[i].last_enable_ms  = 0;
+        }
+    }
 }
 
 /* ================================================================

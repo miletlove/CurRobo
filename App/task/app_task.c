@@ -29,7 +29,7 @@
  */
 #include "app_task.h"
 #include "data_update.h"
-#include "wheel.h"
+#include "Four.h"
 #include "motor_service.h"
 #include "can_service.h"
 #include "remote_control.h"
@@ -81,7 +81,7 @@ static void app_fsm_transition(AppFsmState_t new_state)
 void app_task_init(void)
 {
     /* 电机: 配置速度模式 + 首次使能 */
-    wheel_init();                    /* 设置速度模式 */
+    four_init();                     /* 四驱差速模块 (替代麦克纳姆 wheel_init) */
     motor_service_init();            /* 绑定控制节点 */
     motor_service_enable_all();      /* 发送使能帧 */
     can_service_init();              /* CAN 健康监控 */
@@ -103,8 +103,10 @@ void app_task_run(void)
     data_update_execute();
 
     /* ---- 2. 服务更新 ---- */
-    motor_service_update();   /* 电机重试 + 健康检查 */
-    can_service_update();     /* CAN 总线健康监控 */
+    remote_control_update();   /* 遥控接收超时检测 (online 清零) */
+    four_sw_update();          /* SW 使能开关 (任意 FSM 态生效) */
+    motor_service_update();    /* 电机重试 + 健康检查 */
+    can_service_update();      /* CAN 总线健康监控 */
 
     /* ---- 3. 启动状态机 ---- */
     app_task_fsm_update();
@@ -200,8 +202,8 @@ void app_task_wheel_control(void)
         return;
     }
 
-    /* ── 正常: 遥控器 → 四轮速度映射 ── */
-    wheel_update();
+    /* ── 正常: 遥控器 → 差速运动学映射 (sw 使能开关 + 右摇杆) ── */
+    four_update();
 }
 
 /* ================================================================

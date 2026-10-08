@@ -28,6 +28,8 @@
 #include "data_update.h"
 #include "bsp_usart.h"
 
+#if defined(HAL_IWDG_MODULE_ENABLED)
+
 /* hiwdg1 由 CubeMX 生成的 iwdg.c 定义 */
 extern IWDG_HandleTypeDef hiwdg1;
 
@@ -56,3 +58,21 @@ uint32_t watchdog_check(void)
     if (now >= last) return now - last;
     return (0xFFFFFFFF - last) + now + 1;
 }
+
+#else /* !HAL_IWDG_MODULE_ENABLED */
+
+/* IWDG 未启用 (CubeMX 已关闭): 空实现, 保证编译/链接兼容 */
+void watchdog_init(void)
+{
+}
+
+void watchdog_feed(void)
+{
+}
+
+uint32_t watchdog_check(void)
+{
+    return 0;
+}
+
+#endif /* HAL_IWDG_MODULE_ENABLED */

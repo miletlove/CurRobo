@@ -20,7 +20,6 @@
 #include "main.h"
 #include "dma.h"
 #include "fdcan.h"
-#include "iwdg.h"
 #include "spi.h"
 #include "tim.h"
 #include "usart.h"
@@ -36,6 +35,8 @@
 #include "data_update.h"
 #include "bsp_usart.h"
 #include "app_task.h"
+#include "sys_monitor.h"
+#include "id_test.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -113,11 +114,17 @@ int main(void)
   MX_SPI2_Init();
   MX_UART5_Init();
   MX_TIM6_Init();
-  MX_IWDG1_Init();
   /* USER CODE BEGIN 2 */
 
   pipeline_init();
+#if ID_SCAN_TEST
+  id_test_init();
+#else
   app_task_init();
+#if SYS_MONITOR
+  sys_monitor_init();
+#endif
+#endif
 
   /* USER CODE END 2 */
 
@@ -129,7 +136,14 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
+#if ID_SCAN_TEST
+    id_test_run();
+#else
     app_task_run();
+#if SYS_MONITOR
+    sys_monitor_run();
+#endif
+#endif
   }
   /* USER CODE END 3 */
 }
@@ -156,12 +170,10 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI
-                              |RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.HSIState = RCC_HSI_DIV1;
   RCC_OscInitStruct.HSICalibrationValue = 64;
-  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 4;

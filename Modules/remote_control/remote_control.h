@@ -6,6 +6,9 @@
 #define RC_FRAME_LENGTH     18u
 #define RC_CH_VALUE_OFFSET  1024
 
+/** 遥控器在线超时 (ms): 超过此时间未收到新帧 → 判定离线 */
+#define RC_ONLINE_TIMEOUT_MS  500u
+
 typedef enum { RC_SW_UP=1, RC_SW_MID=3, RC_SW_DOWN=2 } RC_Switch_t;
 #define SW_IS_UP(s)    ((s)==RC_SW_UP)
 #define SW_IS_MID(s)   ((s)==RC_SW_MID)
@@ -28,5 +31,12 @@ void sbus_to_rc(const uint8_t *buf, RC_ctrl_t *rc);
 void remote_control_init(void);
 const RC_ctrl_t *get_remote_control_point(void);
 uint8_t RC_data_is_error(void);
+
+/**
+ * @brief  遥控器在线状态周期更新 (主循环调用, TIM6 时基)
+ * @note   超过 RC_ONLINE_TIMEOUT_MS 未收到新帧 → remote_ctrl.online 清零.
+ *         需要在主循环每周期调用 (如 app_task_run 服务更新区).
+ */
+void remote_control_update(void);
 
 #endif

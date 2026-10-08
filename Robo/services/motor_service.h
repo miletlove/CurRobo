@@ -106,9 +106,18 @@ void motor_service_enable_all(void);
  * @brief  电机服务周期更新 — 检查在线状态 + 自动重试
  * @note   在主循环中每周期调用.
  *         内部以 MOTOR_RETRY_INTERVAL_MS 间隔重试使能.
+ *         若使能总开关为 0 (motor_service_set_enable(0)),
+ *         则全部电机停止且不重试, 直接返回 0.
  * @retval 1=全部电机在线, 0=存在离线/故障
  */
 uint8_t motor_service_update(void);
+
+/**
+ * @brief  电机使能总开关
+ * @param  en  1=允许使能/重试, 0=关闭全部电机 (发 STOP, 禁止重试)
+ * @note   由遥控器拨杆调用 (Four 模块): SW=UP 使能, SW=DOWN 关闭.
+ */
+void motor_service_set_enable(uint8_t en);
 
 /**
  * @brief  获取指定电机的生命周期状态
